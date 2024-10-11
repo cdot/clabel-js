@@ -1,0 +1,68 @@
+// Supported font families
+.font-family-serif {
+  font-family: Times, "Times New Roman", Georgia, serif;
+}
+
+.font-family-sansserif {
+  font-family: Verdana, Arial, Helvetica, sans-serif;
+}
+
+.font-family-monospace {
+  font-family: "Lucida Console", Courier, monospace;
+}
+
+.font-family-cursive {
+  font-family: cursive;
+}
+
+.font-family-fantasy {
+  font-family: fantasy;
+}
+
+.font-family-emoji {
+  font-family: emoji;
+}
+
+.font-family-math {
+  font-family: math;
+}
+
+.font-family-fangsong {
+  font-family: fangsong;
+}
+
+// Number input boxes - font size, line box height
+.three-digits {
+    width: 50px;
+} 
+
+[data-tooltip]:hover::after {
+  display: block;
+  position: absolute;
+  content: attr(data-tooltip);
+  border: 1px solid #dad;
+  background: #ada;
+  padding: .25em;
+}
+
+#strip_div {
+  padding: 0;
+  width: auto;
+  height: auto;
+  display: inline-block;
+}
+
+#strip_img {
+  filter: gray;
+  filter: grayscale(1);
+  -webkit-filter: grayscale(1); 
+}
+
+.strip_liner {
+  border:1px solid blue;
+}
+
+#label_text {
+  width: 100%;
+  height: 50px;
+}

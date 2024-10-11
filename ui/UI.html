@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
+    <!--meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'" />
+    <meta http-equiv="X-Content-Security-Policy" content="default-src 'self'; script-src 'self'" / -->
+    <title>clabel</title>
+    <link rel="icon" href="./clabel.png" type="image/x-icon" />
+    <link href="./styles.css" rel="stylesheet" type="text/css">
+    <!--link id="jQueryTheme" href="./node_modules/jquery-ui/dist/themes/pepper-grinder/jquery-ui.min.css" rel="stylesheet" type="text/css" -->
+    <script src="./node_modules/jquery/dist/jquery.min.js"></script>
+    <script src="./node_modules/dom-to-image/dist/dom-to-image.min.js"></script>
+    <script src="./UI.js" type="module"></script>
+  </head>
+  <body>
+    <div id="info">
+      Model <span id="info_model"></span>, Tape width <span id="info_media_width_mm"></span>mm, <span data-tooltip="The printable width gives the maximum height for the label that can be printed.">Printable width <span id="info_printable_width_mm"></span>mm (<span id="info_printable_width_px"></span>px)</span>
+    </div>
+    <div>
+      <button type="button" id="print" data-tooltip="Send the label to the server for printing">Print</button>
+      <button type="button" id="eject" data-tooltip="Eject the tape far enough so the last printed label is clear of the cutter">Eject</button>
+    </div>
+    <div>
+      <div class="bordered-box">
+        <label for="select_font" data-tooltip="Select the font for the current selection or the whole label if nothing is selected.">Font</label>
+        <select id="select_font">
+          <option>sansserif</option>
+          <option>serif</option>
+          <option>monospace</option>
+          <option>cursive</option>
+          <option>fantasy</option>
+          <option>emoji</option>
+          <option>math</option>
+          <option>fangsong</option>
+        </select>
+        <input id="font-size" class="three-digits" type="number" min="1" max="100" value="30" />px
+        <label for="line-height" data-tooltip="Set the Line Box Height for the selection or the whole label if nothing is selected. This is a percentage of calculated line box height, and can be used to control the vertical height of the label." >LBH</label>
+        <input type="number" class="three-digits" min="1" max="100" id="line-height" value="100" />%
+      </div>
+      <button type="button" id="bold">Bold</button>
+      <button type="button" id="italic">Italic</button>
+      <button type="button" id="invert">Invert</button>
+    </div>
+    <textarea id="label_text"></textarea>
+    <div>
+      Label height: <span id="label_width_mm"></span>mm (<span id="label_width_px"></span>px)
+    </div>
+    HTML
+    <div class="strip_liner">
+      <div id="strip_div" class="font-family-sanserif">strip</div>
+    </div>
+    Image
+    <div class="strip_liner">
+      <img id="strip_img" src=""></img>
+    </div>
+  </body>
+</html>

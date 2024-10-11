@@ -1,0 +1,25 @@
+{
+    "name": "clabel-js",
+    "version": "0.0.1",
+    "type": "module",
+    "description": "CLabel",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "dependencies": {
+        "cors": "^2.8.5",
+        "express": "^4.21.0",
+        "morgan": "^1.10.0",
+        "posix-getopt": "^1.2.1",
+        "rw-stream": "^0.3.3",
+        "sharp": "^0.33.5",
+        "socket.io": "^4.8.0"
+    },
+    "devDependencies": {
+        "assert": "^2.1.0",
+        "chai": "^5.1.1",
+        "mocha": "^10.7.3"
+    }
+}
