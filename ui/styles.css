@@ -12,6 +12,22 @@ h2 {
   font-size: 12pt;
 }
 
+[data-tooltip]:hover:after {
+  font-style: normal;
+  font-size: 12pt;
+  font-weight: normal;
+  content: attr(data-tooltip);
+  position: absolute;
+  border: #c0c0c0 1px dotted;
+  padding: 5px;
+  display: block;
+  z-index: 100;
+  background-color: #ada;
+  color: black;
+  text-decoration: none;
+  text-align:center;
+}
+
 // Supported font families
 .font-family-serif {
   font-family: Times, "Times New Roman", Georgia, serif;
@@ -49,15 +65,6 @@ h2 {
 .three-digits {
     width: 50px;
 } 
-
-[data-tooltip]:hover::after {
-  display: block;
-  position: absolute;
-  content: attr(data-tooltip);
-  border: 1px solid #dad;
-  background: #ada;
-  padding: .25em;
-}
 
 #review_liner {
   border:1px solid blue;

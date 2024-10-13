@@ -455,22 +455,16 @@ class PTouch {
   printImage(image, width, height, bpp = 4) {
 
     /**
-     * Read a pixel from the image, (crudely) converting to b&w as we go.
+     * Read a pixel from the image.
      * @param {number} x x coordinate
      * @param {number} y y coordinate
      * @return {number} 1 if the pixel is black, 0 if it's white
      */
     function getPixel(x, y) {
-      // Process the image data to monochrome 1-bit per pixel
+      // The UI converts the image to 1 bit per pixel, though this is
+      // encoded in RGBA with A being 255 for black and 0 for white.
       const offset = (y * width + x) * bpp;
-      switch (bpp) {
-        // RGB no A 
-      case 3: return (image[offset] + image[offset + 1]
-                      + image[offset + 2] < 3*255) ? 0 : 1;
-      // RGBA any A less than 51 will be treated as transparent
-      case 4: return image[offset + 3] > 50 ? 0 : 1;
-      default: throw new Error(`BPP ${bpp} not supported`);
-      }
+      return image[offset + 3] > 0 ? 1 : 0;
     }
 
     // Promise to initialise, if needed

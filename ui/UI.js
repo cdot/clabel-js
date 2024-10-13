@@ -4,8 +4,6 @@ import { io } from "./node_modules/socket.io/client-dist/socket.io.esm.min.js";
 
 /* global domtoimage */
 
-let dataUrl = "";
-
 // Last info received from the server. This describes the printer.
 let info = {
   model: "Unknown",
@@ -20,6 +18,24 @@ let info = {
   media_width_mm: 0,
   phase: "Uninitialised"
 };
+
+// Thresholds for colour conversion, tunable per image
+let alphaThreshold = 30;
+let colourThreshold = 30;
+
+/**
+ * Get the current selection in the textarea. If start and end
+ * are the same, there is no selection. The selection persists
+ * when the textarea no longer has the focus, and only gets
+ * cleared when it regains the focus.
+ */
+function getTextSelection() {
+  const txtarea = $("#label_text")[0];
+  return {
+    start: txtarea.selectionStart,
+    end: txtarea.selectionEnd
+  };
+}
 
 function setInfo(n) {
   info = n;
@@ -80,6 +96,39 @@ function trim(data, w, h) {
   return { above, below };
 }
 
+/**
+ * Simple algorithm to convert an RGBA image to black and white. Works on
+ * the data in place.
+ * @param {Uint8Array} data the image data
+ * @param {number} w image width
+ * @param {number} h image height
+ */
+function BandW(data, w, h) {
+  console.log(w,"x", h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w;x++) {
+      const offset = ((y * w) + x) * 4;
+      if (data[offset + 3] > alphaThreshold) {
+        let bw = data[offset + 0] * 0.3
+            + data[offset + 1] * 0.59
+            + data[offset + 2] * 0.11;
+        // We are painting on a white background, so colours that
+        // give a higher bw are increasingly washed out and need to
+        // map to white. Darker colours map to black.
+        // 200 threshold chosen arbitrarily.
+        // TODO: make the threshold selectable in the UI
+        if (bw > colourThreshold)
+          data[offset + 3] = 0;
+        else {
+          data[offset + 0] = 0;
+          data[offset + 1] = 0;
+          data[offset + 2] = 0;
+          data[offset + 3] = 255;
+        }
+      }
+    }
+}
+
 function refreshImage() {
   domtoimage
   // Get a Uint8Array with every 4 elements representing the RGBA data
@@ -90,6 +139,7 @@ function refreshImage() {
     const w = node.scrollWidth;
     const h = node.scrollHeight;
     const { above, below } = trim(data, w, h);
+    BandW(data, w, h);
 
     // render the cropped area to an ImageBitmap
     const imageData = new ImageData(data, w, h);
@@ -129,6 +179,10 @@ function onLabelChanged() {
   refreshImage();
 }
 
+/**
+ * Set the font family for the current selection (if there is one)
+ * or the whole document
+ */
 function setFontFamily(font) {
   const classList = $('#review_div').attr('class').split(/\s+/);
   $.each(classList, function(index, item) {
@@ -136,12 +190,28 @@ function setFontFamily(font) {
       $("#review_div").removeClass(item);
     }
   });
-  $("#review_div").addClass(`font-family-${font}`);
+
   refreshImage();
 }
 
 function setFontSize(size) {
   $("#review_div").css("font-size", `${size}px`);
+  refreshImage();
+}
+
+/**
+ * Set the rendering alpha threshold
+ */
+function setAlphaThreshold(th) {
+  alphaThreshold = th;
+  refreshImage();
+}
+
+/**
+ * Set the rendeing colour threshold
+ */
+function setColourThreshold(th) {
+  colourThreshold = th;
   refreshImage();
 }
 
@@ -159,8 +229,18 @@ $(function() {
   setFontSize($("#font-size").val());
 
   $("#print").on("click", function() {
-    $.post("/ajax/print", { png: dataUrl });
+    $.post("/ajax/print", { png: $("#image_canvas")[0].toDataURL() });
   });
+
+  $("#alpha_threshold").on("change", function() {
+    setAlphaThreshold(this.value);
+  });
+  setAlphaThreshold($("#alpha_threshold").val());
+
+  $("#colour_threshold").on("change", function() {
+    setColourThreshold(this.value);
+  });
+  setColourThreshold($("#colour_threshold").val());
 
   $("#eject").on("click", function() {
     $.post("/ajax/eject");

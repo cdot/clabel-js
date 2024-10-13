@@ -6,7 +6,7 @@
     <!--meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'" />
     <meta http-equiv="X-Content-Security-Policy" content="default-src 'self'; script-src 'self'" / -->
     <title>clabel</title>
-    <link rel="icon" href="./clabel.png" type="image/x-icon" />
+    <link rel="icon" href="clabel.svg" type="image/x-icon" />
     <link href="./styles.css" rel="stylesheet" type="text/css">
     <!--link id="jQueryTheme" href="./node_modules/jquery-ui/dist/themes/pepper-grinder/jquery-ui.min.css" rel="stylesheet" type="text/css" -->
     <script src="./node_modules/jquery/dist/jquery.min.js"></script>
@@ -15,13 +15,13 @@
   </head>
   <body>
     <h1 style=" display:flex;align-items:center;">
-      clabel <img src="./clabel.png" style="display:inline-box">
+      <img src="clabel.svg" style="height:60px;display:inline-box"> C-label
     </h1>
     <h2 id="info">
       Printer model <span class="text-model"></span>, Tape width <span class="text-media_width_mm"></span>mm, <span data-tooltip="The printable width gives the maximum height for the label that can be printed.">Printable width <span class="text-printable_width_mm"></span>mm (<span class="text-printable_width_px"></span>px)</span>
     </h2>
     <div>
-      <div class="bordered-box">
+      <div id="textarea_controls" class="bordered-box">
         <h1 data-tooltip="You can type almost any raw HTML you like">
           HTML
         </h1>
@@ -53,6 +53,11 @@
     <h2 data-tooltip="This is the actual bitmap that will be sent to the printer. If the image is wider than the printable area of the tape, the image will be split over multiple lengths of tape. A green box will appear showing the width of the first tape length">
       Image
     </h2>
+    Rendering:
+    <label for="alpha_threshold" data-tooltip="Controls the value of the alpha channel, below which a pixel will be treated as transparent">Transparency</label>
+    <input id="alpha_threshold" class="three-digits" type="number" min="1" max="255" value="30" />
+    <label for="colour_threshold" data-tooltip="Controls the conversion of colours to black and white. Higher values mean more colours are converted.">Colour</label>
+    <input id="colour_threshold" class="three-digits" type="number" min="1" max="255" value="200" />
     <div id="image_liner">
       <canvas id="image_canvas"></canvas>
       <div id="tape_div"></div>
