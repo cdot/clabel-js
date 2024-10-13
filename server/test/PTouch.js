@@ -35,24 +35,25 @@ const L_img = Buffer.from([
 
 let pendingOutput;
 
+// Requires a device on /dev/usb/lp0
 describe("PTouch", () => {
 
   function UNit() {}
 
-  // Requires a device on /dev/usb/lp0
-  UNit("query real device", () => {
-    const dev = new PTouch({ device: "/dev/usb/lp0", debug: console.debug });
-    return dev.initialise()
-    .then(() => dev.close());
-  });
-
   UNit ("tall image", () => {
-    const dev = new PTouchStub({ device: "/dev/usb/lp0", debug: console.debug });
+    const dev = new PTouch({ device: "/dev/usb/lp0", debug: console.debug });
     return dev.printImage(L_img, L_width, L_height)
     .then(() => dev.close());
   });
 
-  it("wide image", () => {
+  it("status", () => {
+    const dev = new PTouch({ device: "/dev/usb/lp0", debug: console.debug });
+    return dev.getStatus()
+    .then(status => console.debug(status))
+    .then(() => dev.close());
+  });
+  
+  UNit("wide image", () => {
     const dev = new PTouchStub({ device: "/dev/usb/lp0", debug: console.debug });
     return dev.initialise()
     .then(() => {

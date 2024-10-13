@@ -1,94 +1,145 @@
 /*Copyright (C) 2024 Crawford Currie http://c-dot.co.uk*/
-import { PTouch } from "../src/PTouch.js";
+/* eslint-env node, mocha */
+
+import { assert } from "chai";
+import { PTouchStub } from "../src/PTouchStub.js";
+
+// 8 pixels wide by 22 high, this is an upper-case L on it's side.
+const L_width = 8;
+const L_height = 22;
+const L_img = Buffer.from([
+  0,0,0,0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,116,  0,0,0,252,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,116,  0,0,0,252,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,116,  0,0,0,252,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,116,  0,0,0,252,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,116,  0,0,0,252,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,116,  0,0,0,252,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,116,  0,0,0,252,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,116,  0,0,0,252,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,116,  0,0,0,252,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,116,  0,0,0,252,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,116,  0,0,0,253,  0,0,0, 80,  0,0,0, 80,  0,0,0,0,  0,0,0, 80,  0,0,0,8,  
+  0,0,0,0,  0,0,0,116,  0,0,0,255,  0,0,0,255,  0,0,0,255,  0,0,0,5,  0,0,0,255,  0,0,0,2,  
+  0,0,0,0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0,  
+  0,0,0,0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,  0,  0,0,0,0,  0,0,0,  0,  0,0,0,0
+]);
 
 let pendingOutput;
 
-const STATUS_REPORT = Buffer.from([
-  0x80, 0x20, 0x42, 0x30, 0x59, 0x30, 0x00, 0x00,
-  0x00, 0x00, 0x0c, 0x01, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-]);
+describe("PTouch", () => {
 
-/**
- * Layer over PTouch that overrides read and write for debug
- */
-class PTouchStub extends PTouch {
+  function UNit() {}
 
-  /**
-   * @override
-   */
-  write(buff) {
-    //console.debug(`Rx ${buff.map(v => Number(v).toString(16)).join(" ")}`);
-    let i = 0;
-    while (i < buff.length) {
-      const at = i;
-      switch (buff[i++]) {
-      case 0x00:
-        //console.debug(`INVALIDATE`);
-        continue;
-      case 0x1B:
-        switch(buff[i++]) {
-        case 0x40:
-          console.debug(`INITIALISE_CLEAR`);
-          continue;
-        case 0x69:
-          switch (buff[i++]) {
-          case 0x53:
-            console.debug(`SEND_PRINTER_STATUS`);
-            pendingOutput = STATUS_REPORT;
-            continue;
-          case 0x52:
-            console.debug(`SET_RASTER_MODE ${buff[i++]}`);
-            continue;
-          case 0x64:
-            const fa = buff[i++];
-            console.debug(`FEED_AMOUNT ${fa + buff[i++] * 256}`);
-            continue;
-          default:
-            throw new Error(`Command error 0x1B 0x69 0x52 0x${buff[i-1].toString(16)}`);
+  it("status", () => {
+    const dev = new PTouchStub({ device: "/dev/usb/lp0" });
+    return dev.getStatus()
+    .then(status => {
+      assert.equal(status.eject_mm, 10);
+      assert.equal(status.raster_px, 128);
+      assert.equal(status.raster_mm, 18);
+      assert.equal(status.printable_width_px, 64);
+      assert.equal(status.printable_width_mm, 9);
+      assert.equal(status.phase, 'Receiving');
+      assert.equal(status.model, 'PT1230PC');
+      assert.equal(status.media_type, 'Laminated');
+      assert.equal(status.media_width_mm, 12);
+      assert.equal(status.eject_px, 71);
+      assert.equal(status.pixel_width_mm, 0.140625);
+      assert.equal(status.media_width_px, 85.33333333333333);
+    });
+  });
+  
+  it("tall image", () => {
+    const dev = new PTouchStub({ device: "/dev/usb/lp0", debug: console.debug });
+    return dev.printImage(L_img, L_width, L_height)
+    .then(() => dev.close())
+    .then(() => assert.equal(dev.output.join(""),
+                             `STAT`
+                             +`COM0`
+                             +`RM1`
+                             +`FD0`
+                             +`EEEEE`
+                             +`R000000007a00000000000000`
+                             +`R000000007a00000000000000`
+                             +`R000000006000000000000000`
+                             +`R000000006000000000000000`
+                             +`R000000006000000000000000`
+                             +`R000000006000000000000000`
+                             +`R000000006000000000000000`
+                             +`R000000006000000000000000`
+                             +`R000000006000000000000000`
+                             +`R000000006000000000000000`
+                             +`R000000006000000000000000`
+                             +`R000000006000000000000000`
+                             +`EEEEE`
+                             +`NF`));
+  });
+
+  it("wide image", () => {
+    const dev = new PTouchStub({ device: "/dev/usb/lp0", debug: console.debug });
+    return dev.initialise()
+    .then(() => {
+      // Make an image wider than the printable width by duplicating each
+      // row
+      const copies = (dev.status.printable_width_px * 2) / L_width;
+      console.debug(`Making ${copies} copies`);
+      const W_img = [];
+      for (let y = 0; y < L_height; y++) {
+        for (let c = 0; c < copies; c++) {
+          for (let x = 0; x < L_width; x++) {
+            for (let b = 0; b < 4; b++)
+              W_img.push(L_img[(y * L_width + x) * 4 + b]);
           }
         }
-        throw new Error(`Protocol violation 0x1B 0x${buff[i-1].toString(16)}`);
-      case 0x1A: console.debug(`PRINT_FEED`); continue;
-      case 0x0C: console.debug(`PRINT_NOFEED`); continue;
-      case 0x5A: console.debug(`EMPTY_RASTER`); continue;
-      case 0x4D: console.debug(`COMPRESSION ${buff[i++]}`); continue;
-      case 0x47:
-        // The image is 8 pixels by 22 high. It's been rotated, so we hope
-        // to have 8 rasters, each 22 bits (3 bytes) wide. Each raster has
-        // 32px = 4 pad bytes to get onto the printable area.
-        let length = buff[i++];
-        length += buff[i++] * 256;
-        let s = "";
-        for (let j = 0; j < length; j++) {
-          const bits = buff[i];
-          for (let k = 7; k >= 0; k--)
-            s += (bits & (1 << k)) > 0 ? "X" : ".";
-          //s += Number(bits).toString(16);
-          s += "|";
-          i++;
-        }
-        console.debug(`SEND_RASTER ${length} ${s}`);
-        continue;
-      default:
-        throw new Error(`Protocol violation 0x${buff[i-1].toString(16)}`);
       }
-    }
-    return Promise.resolve();
-  }
-
-  /**
-   * @override
-   */
-  read() {
-    // Check we had a status request
-    if (!(pendingOutput instanceof Buffer))
-      return Promise.resolve([]);
-    const out = pendingOutput;
-    pendingOutput = undefined;
-    return Promise.resolve(out);
-  }
-}
-
-export { PTouchStub }
+      // We expect 2 tape runs
+      return dev.printImage(Buffer.from(W_img), L_width * copies, L_height);
+    })
+    .then(() => {
+      assert.equal(dev.output.join(""),
+                   `STAT`
+                   +`COM0`
+                   +`RM1`
+                   +`FD0`
+                   +`EEEEE`
+                   +`R000000007a7a7a7a7a7a7a7a`
+                   +`R000000007a7a7a7a7a7a7a7a`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`EEEEE`
+                   +`NF`
+                   +`EEEEE`
+                   +`R000000007a7a7a7a7a7a7a7a`
+                   +`R000000007a7a7a7a7a7a7a7a`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`R000000006060606060606060`
+                   +`EEEEE`
+                   +`NF`);
+    })
+    .then(() => dev.close());
+  });
+});

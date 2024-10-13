@@ -15,8 +15,9 @@ const DESCRIPTION = [
   "DESCRIPTION",
   "\tRun a clabel server",
   "OPTIONS",
-  "\t-p, --port <file> - Port to start server on, default 9094",
-  "\r-d, --device <path> - path to device, default /dev/usb/lp0",
+  "\t-p, --port <file> - Port to start server on (default 9094)",
+  "\t-d, --device <path> - path to printer (default /dev/usb/lp0.",
+  `\t\tUse "sim" for a simulator that doesn't require a device")`,
   "\t-x - set debug (prints to console.debug)",
 ].join("\n");
 
@@ -46,7 +47,7 @@ if (process.argv.length > go_parser.optind()) {
   process.exit();
 }
 
-console.log(
+console.debug(
   `Starting server for device ${options.device}`,
   `on port ${options.port}`);
 

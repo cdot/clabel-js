@@ -1,18 +1,15 @@
 # clabel-js
-Client-server support for a Brother P-Touch 1230PC label printer.
+Support for a Brother P-Touch 1230PC label printer.
+
+Uses a client-server model to take advantage of features of the browser, and of node.js.
 
 Run the server on the machine where the printer is connected with:
 
-node server/server.js <port> <device>
+node server/bin/server.js
 
-e.g.
+Run it without parameters for help.
 
-node server/server.js 32765 /dev/usb/lp0
+Load the UI in a browser using localhost:9094
 
-This will start the server on port 32765, and connect to the printer
-/dev/usb/lp0.
-
-Load the UI in a browser using localhost:32765
-
-Labels are laid out using HTML, and can be reviewed before printing.
+Labels are laid out using HTML.
 

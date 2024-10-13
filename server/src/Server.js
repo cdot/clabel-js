@@ -4,11 +4,11 @@ import Path from "path";
 import Cors from "cors";
 import Express from "express";
 import HTTP from "http";
-import { Server as SocketServer } from "socket.io";
+// Using Sharp for image processing
 import Sharp from "sharp";
 
 import { PTouch } from "./PTouch.js";
-import { PTouchStub } from "../test/PTouchStub.js";
+import { PTouchStub } from "./PTouchStub.js";
 
 // Header for a base64 encoded PNG datUrl
 const PNGhead = "data:image/png;base64,";
@@ -35,9 +35,13 @@ class Server {
     const sim = new Sharp(buff);
     sim
     .rotate(90)
+    // trim background defaults to top-left pixel, but we want it to
+    // be r:0,g:0,b:0,a:0. This might cause problems for images.
+    .trim({ lineArt: true, background: "rgba(0,0,0,0)" })
     .raw()
     .toBuffer({ resolveWithObject: true })
     .then(({ data, info }) => {
+      /* c8 ignore next 2 */
       this.debug(info);
       this.debug(data.join(","));
       
@@ -50,8 +54,10 @@ class Server {
    * Handle an info request. This simply slaps the printer.
    */
   GET_info(req, res) {
-    this.printer.info()
-    .then(info => res.status(200).send(info));
+    this.printer.getStatus()
+    .then(info => {
+      res.status(200).send(info);
+    });
   }
 
   /**
@@ -85,6 +91,7 @@ class Server {
    */
   constructor(params = {}) {
 
+    /* c8 ignore next */
     this.debug = params.debug || function() {};
 
     /**
@@ -101,10 +108,11 @@ class Server {
 
     /* c8 ignore start */
     process.on("unhandledRejection", reason => {
-      // Our Express handlers have some long promise chains, and we want
-      // to be able to abort those chains on an error. To do this we
-      // `throw` an `Error` that has `isHandled` set. That error will
-      // cause an unhandledRejection, but that's OK, we can just ignore it.
+      // Our Express handlers may have some long promise chains, and
+      // we want to be able to abort those chains on an error. To do
+      // this we `throw` an `Error` that has `isHandled` set. That
+      // error will cause an unhandledRejection, but that's OK, we can
+      // just ignore it.
       if (reason && reason.isHandled)
         return;
 
@@ -130,13 +138,14 @@ class Server {
     // html, images, css etc. The Content-type should be set
     // based on the file mime type (extension) but Express doesn't
     // always get it right.....
-    /* c8 ignore next 2 */
+    /* c8 ignore next */
     this.debug(`static files from ${params.docRoot}`);
 
     this.express.use(Express.static(params.docRoot));
 
     const cmdRouter = Express.Router();
 
+    // 
     cmdRouter.get(
       "/",
       (req, res) => res.sendFile(
@@ -163,12 +172,14 @@ class Server {
   }
 
   listen(port, host) {
-    const protocol = HTTP.Server(this.express);
-    protocol.listen(port, "localhost");
-    const io = new SocketServer(protocol);
-    io.sockets.on(
-      "connection",
-      socket => this.attachSocketHandlers(socket));
+    // Don't start the server until the printer has successfully been
+    // initialised
+    this.printer.initialise()
+    .then(() => {
+      // Could also use HTTPS, but why bother?
+      const protocol = HTTP.Server(this.express);
+      protocol.listen(port, "localhost");
+    });
   }
 }
 

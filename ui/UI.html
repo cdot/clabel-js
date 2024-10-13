@@ -14,15 +14,17 @@
     <script src="./UI.js" type="module"></script>
   </head>
   <body>
-    <div id="info">
-      Model <span id="info_model"></span>, Tape width <span id="info_media_width_mm"></span>mm, <span data-tooltip="The printable width gives the maximum height for the label that can be printed.">Printable width <span id="info_printable_width_mm"></span>mm (<span id="info_printable_width_px"></span>px)</span>
-    </div>
-    <div>
-      <button type="button" id="print" data-tooltip="Send the label to the server for printing">Print</button>
-      <button type="button" id="eject" data-tooltip="Eject the tape far enough so the last printed label is clear of the cutter">Eject</button>
-    </div>
+    <h1 style=" display:flex;align-items:center;">
+      clabel <img src="./clabel.png" style="display:inline-box">
+    </h1>
+    <h2 id="info">
+      Printer model <span class="text-model"></span>, Tape width <span class="text-media_width_mm"></span>mm, <span data-tooltip="The printable width gives the maximum height for the label that can be printed.">Printable width <span class="text-printable_width_mm"></span>mm (<span class="text-printable_width_px"></span>px)</span>
+    </h2>
     <div>
       <div class="bordered-box">
+        <h1 data-tooltip="You can type almost any raw HTML you like">
+          HTML
+        </h1>
         <label for="select_font" data-tooltip="Select the font for the current selection or the whole label if nothing is selected.">Font</label>
         <select id="select_font">
           <option>sansserif</option>
@@ -34,25 +36,31 @@
           <option>math</option>
           <option>fangsong</option>
         </select>
-        <input id="font-size" class="three-digits" type="number" min="1" max="100" value="30" />px
-        <label for="line-height" data-tooltip="Set the Line Box Height for the selection or the whole label if nothing is selected. This is a percentage of calculated line box height, and can be used to control the vertical height of the label." >LBH</label>
-        <input type="number" class="three-digits" min="1" max="100" id="line-height" value="100" />%
+        <input id="font-size" class="three-digits" type="number" min="1" max="999" value="30" />px
+        <button type="button" id="bold">Bold</button>
+        <button type="button" id="italic">Italic</button>
+        <button type="button" id="invert">Invert</button>
+        <textarea id="label_text"></textarea>
+        Rendered height: <span id="label_width_mm"></span>mm (<span id="label_width_px"></span>px)
       </div>
-      <button type="button" id="bold">Bold</button>
-      <button type="button" id="italic">Italic</button>
-      <button type="button" id="invert">Invert</button>
     </div>
-    <textarea id="label_text"></textarea>
-    <div>
-      Label height: <span id="label_width_mm"></span>mm (<span id="label_width_px"></span>px)
+    <h2 data-tooltip="This is your HTML rendered in the browser">
+      Review
+    </h2>
+    <div id="review_liner" class="min-height-media_width_px">
+      <div id="review_div" class="font-family-sanserif">strip</div>
     </div>
-    HTML
-    <div class="strip_liner">
-      <div id="strip_div" class="font-family-sanserif">strip</div>
+    <h2 data-tooltip="This is the actual bitmap that will be sent to the printer. If the image is wider than the printable area of the tape, the image will be split over multiple lengths of tape. A green box will appear showing the width of the first tape length">
+      Image
+    </h2>
+    <div id="image_liner">
+      <canvas id="image_canvas"></canvas>
+      <div id="tape_div"></div>
     </div>
-    Image
-    <div class="strip_liner">
-      <img id="strip_img" src=""></img>
+    <hr />
+    <div class="bordered-box">
+      <button type="button" id="print" data-tooltip="Send the label to the server for printing">Print</button>
+      <button type="button" id="eject" data-tooltip="Eject the tape far enough so the last printed label is clear of the cutter">Eject</button>
     </div>
   </body>
 </html>

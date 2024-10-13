@@ -21,6 +21,242 @@ import fs from "node:fs";
 const Fs = fs.promises;
 import assert from "assert";
 
+/**
+ * An object giving the current status of the printer
+ */
+class Status {
+
+  /**
+   * Interpretation of bits in error_information
+   */
+  static ERROR_BITS = [
+    'No media', 'End of media', 'Cutter jam', 'Weak batteries',
+    'Printer in use', 'Unused', 'High-voltage adapter', 'Unused',
+    'Replace media', 'Expansion buffer full', 'Comms error', 'Buffer full',
+    'Cover open', 'Overheating', 'Black marking not detected', 'System error'
+  ];
+
+  /**
+   * Default status block, as gleaned from a PT1230PC
+   * @private
+   */
+  static DEFAULT = [
+    0x80, 0x20, 0x42, 0x30, 0x59, 0x30, 0x00, 0x00,
+    0x00, 0x00, 0x0c, 0x01, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+  ];
+
+  /**
+   * @param {Buffer} raw a byte buffer containing a status report
+   * to be parsed
+   * @param {function} debug function
+   */
+  constructor(raw, debug) {
+    
+    /**
+     * Number of mm of tape to emit to cause an eject. Per model.
+     * @member {number}
+     */
+    this.eject_mm = 0;
+
+    /**
+     * Number of pixels in a raster line. Per model.
+     * @member {number}
+     */
+    this.raster_px = 0;
+
+    /**
+     * Width of a raster line in mm. Per model.
+     * @member {number}
+     */
+    this.raster_mm = 0;
+
+    /**
+     * Number of printable pixels at the centre of each raster line.
+     * Per model.
+     * @member {number}
+     */
+    this.printable_width_px = 0;
+
+    /**
+     * Width in mm of the printable area. This will always be
+     * less than the media width.
+     * @member {number}
+     */
+    this.printable_width_mm = 0;
+
+    /**
+     * Current printer phase, one of "Initialisation", "Receiving",
+     * "Printing", "Feeding"
+     */
+    this.phase = "Initialisation";
+
+    if (raw.length < 32)
+      throw new Error(`Bad status report, length ${raw.length}`);
+
+    if (raw[0] !== 0x80) throw new Error(`Bad print head mark ${raw[0]}`);
+    // raw[1] = Print head size, don't know what this is
+    if (raw[2] !== 0x42) throw new Error(`Bad Brother code ${raw[2]}`);
+    if (raw[3] !== 0x30) throw new Error(`Bad series code ${raw[2]}`);
+    switch(raw[4]) {
+      // Obtained from Brother documents. It's anyone's guess what
+      // goes in the gaps. Each supported printer has to have an entry
+      // in the MODELS object, above.
+    case 0x4A: this.model = "PT500PC"; break;
+    case 0x59: this.model = "PT1230PC"; break;
+    case 0x64: this.model = "PT-H500"; break;
+    case 0x65: this.model = "PT-E500"; break;
+    case 0x67: this.model = "PT-P700"; break;
+    case 0x69: this.model = "PT-P900W"; break;
+    case 0x70: this.model = "PT-P950NW"; break;
+    case 0x71: this.model = "PT-P900"; break;
+    case 0x78: this.model = "PT-P910BT"; break;
+    }
+    if (raw[3] !== 0x30) throw new Error(`Bad country code ${raw[3]}`);
+    // raw[6] Reserved
+    // raw[7] Reserved
+    if (raw[8] !== 0 || raw[9] !== 0)
+      this.error_information = (raw[8] << 8) | raw[9];
+
+    /**
+     * Type of media in the printer
+     * @member {string}
+     */
+    this.media_type = "Unknown";
+    switch(raw[11]) {
+    case 0x01: this.media_type = 'Laminated'; break;
+    case 0x02: this.media_type = "Lettering"; break;
+    case 0x03: this.media_type = 'Non-laminated'; break;
+    case 0x04: this.media_type = 'Fabric'; break;
+    case 0x08: this.media_type = "AV"; break;
+    case 0x09: this.media_type = "HG"; break;
+    case 0x11: this.media_type = 'Heat shrink 2:1'; break;
+    case 0x13: this.media_type = "Fle"; break;
+    case 0x14: this.media_type = "Flexible ID"; break;
+    case 0x15: this.media_type = "Satin"; break;
+    case 0x17: this.media_type = 'Heat shrink 3:1'; break;
+    case 0xFF: this.media_type = 'Incompatible tape'; break;
+    }
+
+    /**
+     * Width of tape media in mm
+     * @member {number}
+     */
+    this.media_width_mm = raw[10];
+
+    // Number of colors
+    if (raw[12] !== 0) this.number_of_colours = raw[12];
+    if(raw[13] !== 0) this.fonts = raw[13]; // Fonts
+    if(raw[14] !== 0) this.japanese_fonts = raw[14]; // Japanese Fonts
+    if ((raw[15] && 1) !== 0) this.mirror_printing = true;
+    if ((raw[15] && 2) !== 0) this.auto_cut = true;
+
+    if (raw[16] !== 0) this.density = raw[16];
+    if (raw[17] !== 0) this.media_length = raw[17];
+    if (raw[16] !== 0) this.density = raw[16];
+    switch (raw[18]) {
+    case 0x01: this.status_type = "Printing complete"; break;
+    case 0x02: this.status_type = "Error occurred"; break;
+    case 0x06: this.statuse_type = "Phase change"; break;
+    }
+
+    switch (raw[19]) {
+    case 0:
+      if (raw[21] === 1)
+        this.phase = "Feeding";
+      else
+        this.phase = "Receiving";
+      break;
+    case 1:
+      this.phase = "Printing"; break;
+    }
+
+    switch (raw[22]) {
+    case 1: this.cover = "Opened"; break;
+    case 2: this.cover = "Closed"; break;
+    }
+
+    if (raw[23] !== 0) this['Expansion area'] = raw[23];
+    if (raw[24] !== 0) this['Tape color information'] = raw[24];
+    if (raw[25] !== 0) this['Text color information'] = raw[25];
+    if (raw[26] !== 0) this['Hardware settings 0'] = raw[26];
+    if (raw[27] !== 0) this['Hardware settings 1'] = raw[27];
+    if (raw[28] !== 0) this['Hardware settings 2'] = raw[28];
+    if (raw[29] !== 0) this['Hardware settings 3'] = raw[29];
+
+    // Use the report to determine device dimensions
+
+    // Complete additional information based on printer model
+    if (MODELS[this.model]) {
+      for (const key of Object.keys(MODELS[this.model]))
+        this[key] = MODELS[this.model][key];
+    } else {
+      throw new Error(`Don't know enough about model ${this.model}`);
+    }
+
+    /**
+     * Number of rasters to emit to cause an eject
+     * @member {number}
+     */
+	  this.eject_px = Math.floor(
+      this.raster_px * this.eject_mm / this.raster_mm + 0.5);
+	
+    /**
+     * Width of a single pixel in mm
+     * @member {number}
+     */
+    this.pixel_width_mm = this.raster_mm / this.raster_px;
+
+    /**
+     * Width of tape media in px
+     * @member {number}
+     */
+    this.media_width_px = this.media_width_mm / this.pixel_width_mm;
+
+    debug(
+      `PTouch: Tape is ${this.media_width_px}px (${this.media_width_mm}mm) wide`);
+
+    debug(`A raster is ${this.raster_px}px (${this.raster_mm}mm),`,
+               `max printable width is ${this.printable_width_px}px`,
+               `(${this.printable_width_px * this.pixel_width_mm}mm)`);
+    
+    if (this.media_width_px < this.printable_width_px) {
+      this.printable_width_px =
+      this.media_width_mm / this.pixel_width_mm;
+      debug(`Tape is narrower than printable area.`,
+            `Reducing printable area to `
+            + `${this.printable_width_px}px for `
+            + `${this.media_width_mm}mm media`);
+    }
+    this.printable_width_mm = 
+    this.printable_width_px * this.pixel_width_mm;
+  }
+}
+
+// Information about printer models that can't be interrogated from the
+// printer. Could be extended with features such as auto-cut, if anyone
+// has a printer that supports that!
+const MODELS = {
+  PT1230PC: {
+    // Width of a single raster, must be 18mm even though the PT1230
+    // only supports up to 12mm tape.
+    raster_mm: 18,
+
+    // Number of pixels in a single raster
+    raster_px: 128,
+
+    // Number of pins available. These are in the middle of a raster,
+    // so a single raster sent to the printer will have 4 pad bytes
+    // before and after the actual printable raster data.
+    printable_width_px: 64,
+
+		// Distance the tape has to be rolled before the cutter is clear
+		// of the end of the print run (mm)
+		eject_mm: 10
+  }
+};
+
 // Send to clear the print buffer
 const INVALIDATE = new Uint8Array(200);
 INVALIDATE.fill(0x00/*NULL*/);
@@ -66,120 +302,33 @@ const SEND_RASTER = 0x47/*G*/;
   // PTP900 manual says this is raster mode only!
 const EMPTY_RASTER = 0x5A/*Z*/;
 
-/**
- * Schema for a status report from the printer. Each byte in the
- * 32 byte report is mapped to a field in an analysis structure.
- * 'name' gives the field name.
- * 'expect' gives the expected value of the byte (what it always is)
- * 'bits' gives the interpretation of specific bits in the byte
- * 'values' gives the interpretation of certain values the byte can take
- */
-const STATUS_BYTES = [
-  { /*00*/ name: 'Print head mark', expect: 0x80 },
-  { /*01*/ name: 'Print head size' }, // print head size?
-  { /*02*/ name: 'Brother code', expect: 0x42 },
-  { /*03*/ name: 'Series code', expect: 0x30 },
-  { /*04*/ name: 'Model',
-    values: {
-      // Obtained from Brother documents. It's anyone's guess what
-      // goes in the gaps
-      0x4A: "PT500PC",
-      0x59: "PT1230PC",
-      0x64: "PT-H500",
-      0x65: "PT-E500",
-      0x67: "PT-P700",
-      0x69: "PT-P900W",
-      0x70: "PT-P950NW",
-      0x71: "PT-P900",
-      0x78: "PT-P910BT"
-    }
-  },
-  { /*05*/ name: 'Country code', expect: 0x30 },
-  { /*06*/ name: 'Reserved06' },
-  { /*07*/ name: 'Reserved07' },
-  { /*08*/ name: 'Error information 1',
-    bits: [
-      'No media', 'End of media', 'Cutter jam', 'Weak batteries',
-      'Printer in use', 'Unused', 'High-voltage adapter', 'Unused'
-    ]
-  },
-  { /*09*/ name: 'Error information 2',
-    bits: [
-      'Replace media', 'Expansion buffer full', 'Comms error', 'Buffer full',
-      'Cover open', 'Overheating', 'Black marking not detected', 'System error'
-    ]
-  },
-  { /*10*/ name: 'Media width' },
-  { /*11*/ name: 'Media type',
-    values: {
-      0x00: 'Unknown', 0x01: 'Laminated', 0x02: "Lettering",
-      0x03: 'Non-laminated', 0x04: 'Fabric', 0x08: "AV", 0x09: "HG",
-      0x11: 'Heat shrink 2:1', 0x13: "Fle", 0x14: "Flexible ID", 0x15: "Satin",
-      0x17: 'Heat shrink 3:1', 0xFF: 'Incompatible tape'
-    }
-  },
-  { /*12*/ name: 'Number of colors', expect: 0 },
-  { /*13*/ name: 'Fonts', expect: 0 },
-  { /*14*/ name: 'Japanese Fonts', expect: 0 },
-  { /*15*/ name: 'Mode',
-    bits: [
-      'reserved', 'reserved', 'not used', 'not used',
-      'not used', 'not used', 'Auto cut', 'Mirror printing'
-    ]},
-  /* The rest are not reported by the PT1230 (always 0) */
-  { /*16*/ name: 'Density' },
-  { /*17*/ name: 'Media length' },
-  { /*18*/ name: 'Status type',
-    values: {
-      0x00: "Reply to status request",
-      0x01: "Printing complete",
-      0x02: "Error occurred",
-      0x06: "Phase change"
-    }
-  },
-  { /*19*/ name: 'Phase type',
-    values: {
-      0x00: "Receiving", 0x01: "Printing"
-    }
-  },
-  { /*20*/ name: 'Phase number HO', expect: 0 },
-  { /*21*/ name: 'Phase number LO' },
-  { /*22*/ name: 'Notification number' },
-  { /*23*/ name: 'Expansion area' },
-  { /*24*/ name: 'Tape color information' },
-  { /*25*/ name: 'Text color information' },
-  { /*26*/ name: 'Hardware settings 0' },
-  { /*27*/ name: 'Hardware settings 1' },
-  { /*28*/ name: 'Hardware settings 2' },
-  { /*29*/ name: 'Hardware settings 3' },
-  { /*30*/ name: 'Reserved30' },
-  { /*31*/ name: 'Reserved31' }
-];
-
 class PTouch {
 
   /**
-   * Write to the device. Only defined so that a test can subclass and override
-   * this method.
-   * @param {Buffer|Array} buffer buffer to write
+   * Write to the device.
+   * @param {Buffer|Array} buff data to write
    * @return {Promise.<undefined>} promise that resolves to undefined
    * @protected
    */
   write(buff) {
     const b = (buff instanceof Buffer) ? buff : Buffer.from(buff);
+    /* c8 ignore next */
     this.debug("->", b);
-    return Fs.writeFile(this.device, b);
+    return this.fd.write(b);
   }
 
   /**
-   * Read from the device. Only defined so that a test can subclass and override
-   * this method.
-   * @return {Promise.<Buffer>} promise that resolves to a buffer
+   * Reads all available data from the device (up to 16384 bytes).
+   * @return {Promise.<Buffer>} promise that resolves to an object
+   * with two properties:
+   * bytesRead: The number of bytes read
+   * buffer: the data read from the device
    * @protected
    */
   read() {
-    return Fs.readFile(this.device)
+    return this.fd.read(this.device)
     .then(data => {
+      /* c8 ignore next */
       this.debug("<-", data);
       return data;
     });
@@ -194,226 +343,94 @@ class PTouch {
 
     /**
      * Report function
+     * @member {function}
      */
+    /* c8 ignore next */
     this.debug = params.debug || function() {};
 
     /**
      * Pathname of the output device e.g. /dev/usb/lp0
+     * @member {string}
      */
     this.device = params.device;
 
     if (!this.device) throw new Error("No device specified");
 
     /**
-     * Width of a single pixel in mm
-     * @member {number}
+     * Current printer status read from most recent status report
      */
-    this.pixel_width_mm = 0;
+    this.status = new Status(Status.DEFAULT, this.debug);
 
     /**
-     * Number of mm of tape to emit to cause an eject
-     * @member {number}
-     */
-    this.eject_mm = 0;
-
-    /**
-     * Number of rasters to emit to cause an eject
-     * @member {number}
-     */
-    this.eject_px = 0;
-
-    /**
-     * Number of pixels in a raster line
-     * @member {number}
-     */
-    this.raster_px = 0;
-
-    /**
-     * Width of a raster line in mm
-     * @member {number}
-     */
-    this.raster_mm = 0;
-
-    /**
-     * Number of printable pixels at the centre of each raster line.
-     * @member {number}
-     */
-    this.printable_width_px = 0;
-
-    /**
-     * Width in mm of the printable area. This will always be
-     * less than the media width.
-     * @member {number}
-     */
-    this.printable_width_mm = 0;
-
-    /**
-     * width of tape media in px
-     * @member {number}
-     */
-    this.media_width_px = 0;
-
-    /**
-     * width of tape media in mm
-     * @member {number}
-     */
-    this.media_width_mm = 0;
-
-    /**
-     * Once a response has been received from the printer, this will
-     * change to "Receiving" (when the device is in a passive receive state),
-     * "Printing", or "Feeding".
+     * Flag to indicate successult device initialisation
      * @private
      */
-    this.phase = "Initialisation";
-
     this.initialised = false;
+  }
+
+
+  /**
+   * Promise to get a block of status information about the printer
+   * @return {Promise<Status>} promise resolving to a Status object
+   */
+  getStatus() {
+    return this.initialise()
+    .then(() => this.status);
   }
 
   /**
    * Disconnect from the printer
    */
   close() {
-    if (this.initialised && this.fd) {
+    if (this.fd) {
       this.fd.close();
+      this.fd = undefined;
     }
-    this.initialised = this.fd = undefined;
+    this.initialised = false;
   }
 
   /**
-   * Reset the printer, request a status report and analyse it.
+   * Promise to reset the printer, request a status report and analyse it.
+   * @return {Promise.<StatusReport>} promise resolving to the status report
    * @private
    */
   getStatusReport() {
-    return this.fd.write(Buffer.from(
-      [ ...INVALIDATE, ...INITIALISE_CLEAR, ...SEND_STATUS ]))
+    return this.write(
+      [ ...INVALIDATE, ...INITIALISE_CLEAR, ...SEND_STATUS ])
     .then(res => {
       this.debug("WROTE", res.bytesWritten);
-      return this.fd.read();
+      return this.read();
     })
     .then(res => {
       if (res.bytesRead > 0) {
         this.debug("READ", res.bytesRead, res.buffer[0]);
+        // Check for print head mark
         if (res.buffer[0] === 0x80)
-          return this.analyseStatusReport(res.buffer);
+          return this.status = new Status(res.buffer, this.debug);
       }
       // Recursively try again. Shouldn't take more than a
-      // couple of tries.
+      // couple of tries. If it does then it'll blow up, but
+      // that's OK.
       return this.getStatusReport();
     });
   }
 
   /**
    * Promise to initialise the device by clearing the device down,
-   * requesting a status report from the device, and waiting for
-   * asynchronous initialisation.
-   * @return {Promise.<undefined>} Promise that resolves to undefined
-   * @private
+   * and requesting a status report from the device.
+   * @return {Promise.<StatusReport>} Promise that resolves to a
+   * printer status report
    */
   initialise() {
     if (this.initialised)
-      return Promise.resolve();
+      return Promise.resolve(this.status);
 
     return Fs.open(this.device, "r+")
     .then(fd => {
       this.fd = fd;
+      this.initialised = true;
       return this.getStatusReport();
-    })
-    .then(() => {
-      this.debug(`PTouch: Printable width is ${this.printable_width_px}px`,
-                 `(${this.printable_width_mm}mm)`);
     });
-  }
-
-  /**
-   * Use the STATUS_BYTES to make sense of the status report
-   * @param {Buffer} the buffer containing the status
-   * @private
-   */
-  analyseStatusReport(reply) {
-    console.debug("PTouch: ANALYSING status");
-    const report = {};
-    let idx = 0;
-    for (const sb of STATUS_BYTES) {
-      let r = reply[idx++];
-      if (typeof sb.expect !== "undefined") {
-        if (r !== sb.expect)
-          throw new Error(`Unexpected ${sb.name} in status; got ${r} but expected ${sb.expect}`);
-        report[sb.name] = r;
-      }
-      else if (typeof sb.bits !== "undefined") {
-        let mask = 1;
-        const set = []; // strings
-        for (let b = 0; b < 8; b++) {
-          if ((r & (1 << b)) === 0)
-            continue;
-          set.push(sb.bits[b]);
-          mask *= 2;
-        }
-        report[sb.name] = set.join("|");
-      }
-      else if (typeof sb.values !== "undefined") {
-        report[sb.name] = sb.values[r];
-      } else {
-        report[sb.name] = r;
-      }
-    }
-
-    // Use the report to determine device dimensions
-    this.model = report.Model;
-    this.media_width_mm = report['Media width'];
-    this.phase = report['Phase Type'];
-    if (this.phase === "Receiving" && report['Phase number LO'] === 1)
-      this.phase = "Feeding";
-
-    if (this.model === "PT1230PC") {
-
-      // Width of a single raster, must be 18mm even though the PT1230
-      // only supports up to 12mm tape
-      this.raster_mm = 18;
-
-      // Number of pixels in a single raster
-      this.raster_px = 128;
-
-      // max no of pins available
-      this.printable_width_px = 64;
-
-		  // Distance the tape has to be rolled before the cutter is aligned
-		  // to the start of the print run
-		  this.eject_mm = 25;
-    } else {
-      throw new Error(`Don't know enough about model ${this.model}`);
-    }
-
-    // Number of rasters to eject raster_mm of tape
-	  this.eject_px = Math.floor(
-      this.raster_px * this.eject_mm / (this.raster_mm) + 0.5);
-	
-    // pixel_width_mm - width of a single pixel in mm
-    this.pixel_width_mm = this.raster_mm / this.raster_px;
-
-    // Outside width of tape
-    this.media_width_px = this.media_width_mm / this.pixel_width_mm;
-
-    this.debug(
-      `PTouch: Tape is ${this.media_width_px}px (${this.media_width_mm}mm) wide`);
-
-    this.debug(`A raster is ${this.raster_px}px (${this.raster_mm}mm),`,
-               `max printable width is ${this.printable_width_px}px`,
-               `(${this.printable_width_px * this.pixel_width_mm}mm)`);
-    
-    if (this.media_width_px < this.printable_width_px) {
-      this.printable_width_px =
-      this.media_width_mm / this.pixel_width_mm;
-      this.debug(`Tape is narrower than printable area.`,
-                 `Reducing printable area to `
-                 + `${this.printable_width_px}px for `
-                 + `${this.media_width_mm}mm media`);
-    }
-    this.printable_width_mm = 
-    this.printable_width_px * this.pixel_width_mm;
-
-    this.initialised = true;
   }
 
   /**
@@ -422,14 +439,13 @@ class PTouch {
    */
   eject() {
     this.debug(`PTouch: Eject ${this.eject_px} rasters`);
-    const buff = Buffer.alloc(this.eject_px + 1, EMPTY_RASTER);
+    const buff = Buffer.alloc(this.status.eject_px + 1, EMPTY_RASTER);
     buff[buff.length - 1] = PRINT_NOFEED;
     return this.write(buff);
   }
 
   /**
    * Format and print a monochrome image held in a one-bit-per-pixel buffer.
-   * The image must be small enough that it will fit.
    * @param {Buffer} image the image buffer (raw pixel data)
    * @param {number} width width of the image
    * @param {number} height height of the image
@@ -460,16 +476,10 @@ class PTouch {
     // Promise to initialise, if needed
     return this.initialise()
     .then(() => {
-      let s = "";
-      for(let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++)
-          s += getPixel(x, y) === 0 ? "X" : ".";
-        s += "\n";
-      }
-      this.debug(`PTouch: *** Printing image w=${width} h=${height}\n${s}`);
+      this.debug(`PTouch: *** Printing image w=${width} h=${height}`);
 
       // Each raster is padded by blank bits to centre the image
-      const padding = (this.raster_px - this.printable_width_px) / 2;
+      const padding = (this.status.raster_px - this.status.printable_width_px) / 2;
       this.debug(`\tStart padding ${padding}px (${padding / 8} bytes)`);
 
       // The print buffer
@@ -477,12 +487,12 @@ class PTouch {
                        ...SET_RASTER_MODE, 1,
                        ...FEED_AMOUNT, 0, 0 ];
 
-      this.debug(` Requires ${Math.ceil(width / this.printable_width_px)} tape runs`);
+      this.debug(` Requires ${Math.ceil(width / this.status.printable_width_px)} tape runs`);
 
       // Split into tape lengths, each max printable_width_px wide
       let offset = 0;
       while (offset < width) {
-        let printwidth = this.printable_width_px;
+        let printwidth = this.status.printable_width_px;
         if (offset + printwidth > width) {
           printwidth = width - offset;
         }
@@ -495,7 +505,7 @@ class PTouch {
 
         // Construct rasters
         for (let y = height - 1; y >= 0 ; y--) {
-          const raster = new Uint8Array((padding + this.printable_width_px) / 8);
+          const raster = new Uint8Array((padding + this.status.printable_width_px) / 8);
           raster.fill(0);
           let raster_byte = 0;
           let empty = true;
@@ -536,7 +546,6 @@ class PTouch {
             // Note: The PT1230PC can't print more than 64
             // bits in a raster, so the second byte will
             // always be 0 for this device.
-            //console.debug(`  ${raster.map(v => Number(v).toString(16)).join(" ")}`);
             buffer.push(SEND_RASTER,
                         raster.length % 256,
                         Math.floor(raster.length / 256));
@@ -552,5 +561,4 @@ class PTouch {
   }
 }
 
-export { PTouch }
-    
+export { PTouch, Status }
