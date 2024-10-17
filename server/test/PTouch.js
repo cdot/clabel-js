@@ -3,7 +3,7 @@
 
 import { assert } from "chai";
 import { PTouch } from "../src/PTouch.js";
-import { PTouchStub } from "./PTouchStub.js";
+import { toBinary, fromBinary } from "../src/Readable.js";
 
 // 8 pixels wide by 22 high, this is an upper-case L on it's side.
 const L_width = 8;
@@ -35,26 +35,63 @@ const L_img = Buffer.from([
 
 let pendingOutput;
 
-// Requires a device on /dev/usb/lp0
 describe("PTouch", () => {
 
   function UNit() {}
 
-  UNit ("tall image", () => {
-    const dev = new PTouch({ device: "/dev/usb/lp0", debug: console.debug });
-    return dev.printImage(L_img, L_width, L_height)
-    .then(() => dev.close());
-  });
-
-  it("status", () => {
-    const dev = new PTouch({ device: "/dev/usb/lp0", debug: console.debug });
-    return dev.getStatus()
-    .then(status => console.debug(status))
+  // Requires a PT1230C device on /dev/usb/lp0
+  UNit("status", () => {
+    const dev = new PTouch({ model: "PT1230PC", device: "/dev/usb/lp0", debug: console.debug });
+    return dev.initialise()
+    .then(() => dev.getStatusReport())
+    .then(status => {
+      assert.equal(status.eject_mm, 10);
+      assert.equal(status.raster_px, 128);
+      assert.equal(status.raster_mm, 18);
+      assert.equal(status.printable_width_px, 64);
+      assert.equal(status.printable_width_mm, 9);
+      assert.equal(status.phase, 'Receiving');
+      assert.equal(status.model, 'PT1230');
+      assert.equal(status.media_type, 'Laminated');
+      assert.equal(status.media_width_mm, 12);
+      assert.equal(status.eject_px, 71);
+      assert.equal(status.pixel_width_mm, 0.140625);
+      assert.equal(status.media_width_px, 85.33333333333333);
+    })
     .then(() => dev.close());
   });
   
+  // Doesn't require a device
+  UNit("status", () => {
+    const dev = new PTouch({ model: "PT1230PC_F", device: "/tmp/blah", debug: console.debug });
+    return dev.initialise()
+    .then(() => console.log(dev.status))
+    .then(() => dev.getStatusReport())
+    .then(status => {
+      assert.equal(status.eject_mm, 10);
+      assert.equal(status.raster_px, 128);
+      assert.equal(status.raster_mm, 18);
+      assert.equal(status.printable_width_px, 64);
+      assert.equal(status.printable_width_mm, 9);
+      assert.equal(status.model, 'PT1230');
+      assert.equal(status.media_type, 'Laminated');
+      assert.equal(status.media_width_mm, 12);
+      assert.equal(status.eject_px, 71);
+      assert.equal(status.pixel_width_mm, 0.140625);
+      assert.equal(status.media_width_px, 85.33333333333333);
+    })
+    .then(() => dev.close());
+  });
+  
+  it ("tall image, to file", () => {
+    const dev = new PTouch({ model: "PT1230_F", device: "/tmp/ptouch", debug: console.debug });
+    return dev.initialise()
+    .then(() => dev.printImage(L_img, L_width, L_height))
+    .then(() => dev.close());
+  });
+
   UNit("wide image", () => {
-    const dev = new PTouchStub({ device: "/dev/usb/lp0", debug: console.debug });
+    const dev = new PTouch({ model: "PT1230_F", device: "/tmp/ptouch", debug: console.debug });
     return dev.initialise()
     .then(() => {
       // Make an image wider than the printable width by duplicating each

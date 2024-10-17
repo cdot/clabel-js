@@ -40,7 +40,8 @@ describe("PTouch", () => {
 
   it("status", () => {
     const dev = new PTouchStub({ device: "/dev/usb/lp0" });
-    return dev.getStatus()
+    return dev.initialise()
+    .then(() => dev.getStatusReport())
     .then(status => {
       assert.equal(status.eject_mm, 10);
       assert.equal(status.raster_px, 128);
@@ -48,7 +49,7 @@ describe("PTouch", () => {
       assert.equal(status.printable_width_px, 64);
       assert.equal(status.printable_width_mm, 9);
       assert.equal(status.phase, 'Receiving');
-      assert.equal(status.model, 'PT1230PC');
+      assert.equal(status.model.name, 'PT1230PC');
       assert.equal(status.media_type, 'Laminated');
       assert.equal(status.media_width_mm, 12);
       assert.equal(status.eject_px, 71);
@@ -58,29 +59,44 @@ describe("PTouch", () => {
   });
   
   it("tall image", () => {
-    const dev = new PTouchStub({ device: "/dev/usb/lp0", debug: console.debug });
+    const dev = new PTouchStub({
+      device: "/dev/usb/lp0", debug: console.debug });
     return dev.printImage(L_img, L_width, L_height)
     .then(() => dev.close())
-    .then(() => assert.equal(dev.output.join(""),
-                             `STAT`
-                             +`COM0`
-                             +`RM1`
-                             +`FD0`
-                             +`EEEEE`
-                             +`R000000007a00000000000000`
-                             +`R000000007a00000000000000`
-                             +`R000000006000000000000000`
-                             +`R000000006000000000000000`
-                             +`R000000006000000000000000`
-                             +`R000000006000000000000000`
-                             +`R000000006000000000000000`
-                             +`R000000006000000000000000`
-                             +`R000000006000000000000000`
-                             +`R000000006000000000000000`
-                             +`R000000006000000000000000`
-                             +`R000000006000000000000000`
-                             +`EEEEE`
-                             +`NF`));
+    .then(() => assert.deepEqual(
+      dev.output, [
+        [
+          "Status"
+        ],
+        [
+          "Compress 0",
+          "Raster_mode 1",
+          "Feed 0",
+          "Empty_raster",
+          "Empty_raster",
+          "Empty_raster",
+          "Empty_raster",
+          "Empty_raster",
+          "Raster 000000007f00000000000000",
+          "Raster 000000007b00000000000000",
+          "Raster 000000006000000000000000",
+          "Raster 000000006000000000000000",
+          "Raster 000000006000000000000000",
+          "Raster 000000006000000000000000",
+          "Raster 000000006000000000000000",
+          "Raster 000000006000000000000000",
+          "Raster 000000006000000000000000",
+          "Raster 000000006000000000000000",
+          "Raster 000000006000000000000000",
+          "Raster 000000006000000000000000",
+          "Empty_raster",
+          "Empty_raster",
+          "Empty_raster",
+          "Empty_raster",
+          "Empty_raster",
+          "Print 0"
+        ]
+      ]));
   });
 
   it("wide image", () => {
@@ -104,41 +120,64 @@ describe("PTouch", () => {
       return dev.printImage(Buffer.from(W_img), L_width * copies, L_height);
     })
     .then(() => {
-      assert.equal(dev.output.join(""),
-                   `STAT`
-                   +`COM0`
-                   +`RM1`
-                   +`FD0`
-                   +`EEEEE`
-                   +`R000000007a7a7a7a7a7a7a7a`
-                   +`R000000007a7a7a7a7a7a7a7a`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`EEEEE`
-                   +`NF`
-                   +`EEEEE`
-                   +`R000000007a7a7a7a7a7a7a7a`
-                   +`R000000007a7a7a7a7a7a7a7a`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`R000000006060606060606060`
-                   +`EEEEE`
-                   +`NF`);
+      assert.deepEqual(
+        dev.output,
+        [
+          [
+            "Status"
+          ],
+          [
+            "Compress 0",
+            "Raster_mode 1",
+            "Feed 0",
+            "Empty_raster",
+            "Empty_raster",
+            "Empty_raster",
+            "Empty_raster",
+            "Empty_raster",
+            "Raster 000000007f00000000000000",
+            "Raster 000000007b00000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Empty_raster",
+            "Empty_raster",
+            "Empty_raster",
+            "Empty_raster",
+            "Empty_raster",
+            "Print 0",
+            "Empty_raster",
+            "Empty_raster",
+            "Empty_raster",
+            "Empty_raster",
+            "Empty_raster",
+            "Raster 000000007f00000000000000",
+            "Raster 000000007b00000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Raster 000000006000000000000000",
+            "Empty_raster",
+            "Empty_raster",
+            "Empty_raster",
+            "Empty_raster",
+            "Empty_raster",
+            "Print 0"
+          ]
+        ]);
     })
     .then(() => dev.close());
   });

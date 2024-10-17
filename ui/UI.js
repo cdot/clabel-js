@@ -57,11 +57,10 @@ function setInfo(n) {
  */
 function trim(data, w, h) {
 
-  function keep(offset) {
-    return data[offset] > 0
-    || data[offset + 1] > 0
-    || data[offset + 2] > 0
-    || data[offset + 3] > 0;
+  function keep(data, offset) {
+    const r = data[offset+0], b = data[offset+1],
+          g = data[offset+2], a = data[offset+3];
+    return r > 0 || g > 0 || b > 0 || a > 0;
   }
 
   // crop the image from the top down
@@ -69,7 +68,7 @@ function trim(data, w, h) {
   let above, crop = true;
   for (above = 0; crop && above < h; above++) {
     for (let x = 0; x < w; x++) {
-      if (keep((above * w + x) * 4)) {
+      if (keep(data, (above * w + x) * 4)) {
         crop = false;
         break;
       }
@@ -85,7 +84,7 @@ function trim(data, w, h) {
     crop = true;
     for (below = 0; crop && h - below > above; below++) {
       for (let x = 0; x < w; x++) {
-        if (keep(((h - 1 - below) * w + x) * 4)) {
+        if (keep(data, ((h - 1 - below) * w + x) * 4)) {
           crop = false;
           break;
         }
@@ -139,6 +138,7 @@ function refreshImage() {
     const w = node.scrollWidth;
     const h = node.scrollHeight;
     const { above, below } = trim(data, w, h);
+    console.log("Garter and stockings", above, below, w, h);
     BandW(data, w, h);
 
     // render the cropped area to an ImageBitmap
@@ -157,6 +157,7 @@ function refreshImage() {
 
     $("#label_length_px").text(w);
     $("#label_length_mm").text(w * info.pixel_width_mm);
+
     $("#label_width_px").text(h);
     $("#label_width_mm").text(h * info.pixel_width_mm);
     if (h > info.printable_width_px) {

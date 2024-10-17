@@ -14,18 +14,19 @@ import { PTouchStub } from "./PTouchStub.js";
 const PNGhead = "data:image/png;base64,";
 
 /**
- * A server for handling print commands sent to a PTouch label printer.
- * Routes
- * GET /<doc> - serve a static document from ../../ui
- * GET /ajax/info - get information about the printer
- * POST /ajax/print - print an image sent in a PNG dataurl
- * POST /ajax/eject - eject the tape so it can be cut
+ * A server for printing labels on a PTouch label printer.
+ * Routes:
+ * - GET /<doc> - serve a static document
+ * - GET /ajax/info - get information about the printer
+ * - POST /ajax/print - print an image sent in a PNG dataurl
+ * - POST /ajax/eject - eject the tape so it can be cut
  */
 class Server {
 
   /**
    * Handle an incoming print request. The image to be printed is assumed
-   * to have the long edge along the X-axis.
+   * to have the long edge along the X-axis. It can be wider than the tape
+   * width, in which case it will be broken up into tape runs.
    * @private
    */
   POST_print(req, res) {
@@ -51,29 +52,10 @@ class Server {
   }
 
   /**
-   * Handle an info request. This simply slaps the printer.
+   * Handle an info request.
    */
   GET_info(req, res) {
-    this.printer.getStatus()
-    .then(info => {
-      res.status(200).send(info);
-    });
-  }
-
-  /**
-   * Handle an incoming image save request. Used for debugging.
-   * @private
-   */
-  POST_save(req, res) {
-    const filename = req.params.filename;
-    // Reconstruct a Buffer from the dataUrl
-    const buff = Buffer.from(
-      req.body.png.substr(PNGhead.length), 'base64');
-    const sim = new Sharp(buff);
-    sim
-    // Rotate it so the orientation matches what the printer expects
-    .rotate(90)
-    .toFile(filename);
+    res.status(200).send(this.printer.status);
   }
 
   /**
@@ -88,31 +70,26 @@ class Server {
    * @param {object} params
    * @param {string} params.device print device
    * @param {function?} params.debug debug print function
+   * @param {boolean?} params.write_only passed to printer, to disable
+   * bidirectional comms.
    */
   constructor(params = {}) {
 
     /* c8 ignore next */
-    this.debug = params.debug || function() {};
+    this.debug = params.debug ?? function() {};
 
     /**
-     * List of sockets connected to this server
-     * @member {socket[]}
-     * @private
+     * The printer
      */
-    this.clients = [];
-
-    if (params.device == "sim")
-      this.printer = new PTouchStub(params);
-    else
-      this.printer = new PTouch(params);
+    this.printer = new PTouch(params);
 
     /* c8 ignore start */
     process.on("unhandledRejection", reason => {
-      // Our Express handlers may have some long promise chains, and
-      // we want to be able to abort those chains on an error. To do
-      // this we `throw` an `Error` that has `isHandled` set. That
-      // error will cause an unhandledRejection, but that's OK, we can
-      // just ignore it.
+      // Our Express handlers may have long promise chains, and we
+      // want to be able to abort those chains cleanly on a handled
+      // error. To do this we can `throw` an `Error` that has
+      // `isHandled` set. That error will cause an unhandledRejection,
+      // but that's OK, we can just ignore it.
       if (reason && reason.isHandled)
         return;
 
@@ -135,12 +112,9 @@ class Server {
     this.express.use(Express.json());
 
     // Grab all static files relative to the project root
-    // html, images, css etc. The Content-type should be set
-    // based on the file mime type (extension) but Express doesn't
-    // always get it right.....
+    // html, images, css etc.
     /* c8 ignore next */
     this.debug(`static files from ${params.docRoot}`);
-
     this.express.use(Express.static(params.docRoot));
 
     const cmdRouter = Express.Router();
@@ -171,14 +145,19 @@ class Server {
     this.express.use(cmdRouter);
   }
 
-  listen(port, host) {
+  /**
+   * Start the server listing on the given port
+   * @param {number} port number
+   * @param {string?} host host name (default "localhost")
+   */
+  listen(port, host = "localhost") {
     // Don't start the server until the printer has successfully been
     // initialised
     this.printer.initialise()
     .then(() => {
       // Could also use HTTPS, but why bother?
       const protocol = HTTP.Server(this.express);
-      protocol.listen(port, "localhost");
+      protocol.listen(port, host);
     });
   }
 }
