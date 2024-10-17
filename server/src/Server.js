@@ -36,16 +36,9 @@ class Server {
     const sim = new Sharp(buff);
     sim
     .rotate(90)
-    // trim background defaults to top-left pixel, but we want it to
-    // be r:0,g:0,b:0,a:0. This might cause problems for images.
-    .trim({ lineArt: true, background: "rgba(0,0,0,0)" })
     .raw()
     .toBuffer({ resolveWithObject: true })
-    .then(({ data, info }) => {
-      /* c8 ignore next 2 */
-      this.debug(info);
-      this.debug(data.join(","));
-      
+    .then(({ data, info }) => {     
       return this.printer.printImage(
         data, info.width, info.height, info.channels);
     });

@@ -10,7 +10,7 @@
     <link href="./styles.css" rel="stylesheet" type="text/css">
     <!--link id="jQueryTheme" href="./node_modules/jquery-ui/dist/themes/pepper-grinder/jquery-ui.min.css" rel="stylesheet" type="text/css" -->
     <script src="./node_modules/jquery/dist/jquery.min.js"></script>
-    <script src="./node_modules/dom-to-image/dist/dom-to-image.min.js"></script>
+    <script src="./node_modules/dom-to-image-more/dist/dom-to-image-more.min.js"></script>
     <script src="./UI.js" type="module"></script>
   </head>
   <body>
@@ -25,7 +25,7 @@
         <h1 data-tooltip="You can type almost any raw HTML you like">
           HTML
         </h1>
-        <label for="select_font" data-tooltip="Select the font for the current selection or the whole label if nothing is selected.">Font</label>
+        <label for="select_font" data-tooltip="Select the default font">Font</label>
         <select id="select_font">
           <option>sansserif</option>
           <option>serif</option>
@@ -36,12 +36,12 @@
           <option>math</option>
           <option>fangsong</option>
         </select>
-        <input id="font-size" class="three-digits" type="number" min="1" max="999" value="30" />px
-        <button type="button" id="bold">Bold</button>
-        <button type="button" id="italic">Italic</button>
-        <button type="button" id="invert">Invert</button>
+        <input id="font-size" class="three-digits" type="number" min="1" max="999" value="64" />px
         <textarea id="label_text"></textarea>
-        Rendered height: <span id="label_width_mm"></span>mm (<span id="label_width_px"></span>px)
+        <div id="rendering_info">
+          Label width: <span id="label_width_mm"></span>mm (<span id="label_width_px"></span>px), length <span id="label_length_mm"></span>mm (<span id="label_length_px"></span>px)
+        </div>
+        <div id="rendering_error"></div>
       </div>
     </div>
     <h2 data-tooltip="This is your HTML rendered in the browser">

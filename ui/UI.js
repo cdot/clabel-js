@@ -52,8 +52,7 @@ function setInfo(n) {
  * @param {Uint8Array} data the image data
  * @param {number} w image width
  * @param {number} h image height
- * @return {object.<above, below>} number of rows above and below the
- * image to be trimmed
+ * @return {number[]} [0] = top of trimmed image [1] = new height
  */
 function trim(data, w, h) {
 
@@ -64,46 +63,50 @@ function trim(data, w, h) {
   }
 
   // crop the image from the top down
-  let cropping = true;
-  let above, crop = true;
-  for (above = 0; crop && above < h; above++) {
+  let top = 0, crop = true;
+  while (crop && top < h) {
     for (let x = 0; x < w; x++) {
-      if (keep(data, (above * w + x) * 4)) {
+      if (keep(data, (top * w + x) * 4)) {
+        console.debug(`First top keep at ${top},${x}`);
         crop = false;
         break;
       }
     }
+    if (crop) top++;
   }
 
-  let below = 0;
-  if (above >= h)
-    // still cropping when we reached the top of the image
-    above = 0;
-  else {
-    // Found at least one uncroppable row, crop up from the bottom
-    crop = true;
-    for (below = 0; crop && h - below > above; below++) {
-      for (let x = 0; x < w; x++) {
-        if (keep(data, ((h - 1 - below) * w + x) * 4)) {
-          crop = false;
-          break;
-        }
+  if (top >= h) {
+    // still cropping when we reached the bottom of the image
+    console.debug("Image is empty");
+    return [ 0, h ];
+  }
+
+  // Found at least one uncroppable row, crop up from the bottom
+  let height = h - top;
+  crop = true;
+  while (crop && height > 0) {
+    for (let x = 0; x < w; x++) {
+      if (keep(data, ((top + height - 1) * w + x) * 4)) {
+        console.debug(`First bottom keep at ${height},${x}`);
+        crop = false;
+        break;
       }
     }
-    if (below > 0) below--;
+    if (crop) height--;
   }
-  return { above, below };
+  console.debug(`top ${top} height ${height}`);
+  return [ top, height ];
 }
 
 /**
- * Simple algorithm to convert an RGBA image to black and white. Works on
- * the data in place.
+ * Simple algorithm to convert an RGBA image to black and white.
+ * Works on the data in place, simply sets black pixels as opaque and white
+ * pixels as transparent.
  * @param {Uint8Array} data the image data
  * @param {number} w image width
  * @param {number} h image height
  */
 function BandW(data, w, h) {
-  console.log(w,"x", h);
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w;x++) {
       const offset = ((y * w) + x) * 4;
@@ -114,8 +117,6 @@ function BandW(data, w, h) {
         // We are painting on a white background, so colours that
         // give a higher bw are increasingly washed out and need to
         // map to white. Darker colours map to black.
-        // 200 threshold chosen arbitrarily.
-        // TODO: make the threshold selectable in the UI
         if (bw > colourThreshold)
           data[offset + 3] = 0;
         else {
@@ -128,50 +129,56 @@ function BandW(data, w, h) {
     }
 }
 
+/**
+ * Render the review window to the image canvas.
+ */
 function refreshImage() {
-  domtoimage
-  // Get a Uint8Array with every 4 elements representing the RGBA data
-  .toPixelData($("#review_div")[0])
-  .then(data => {
-    // Construct an ImageData object from the pixel data
-    const node = $("#review_div")[0];
-    const w = node.scrollWidth;
-    const h = node.scrollHeight;
-    const { above, below } = trim(data, w, h);
-    console.log("Garter and stockings", above, below, w, h);
-    BandW(data, w, h);
+  $("#rendering_error").text("Rendering").show();
+  $("#rendering_info").hide();
+  setTimeout(() => {
+    domtoimage
+    // Get a Uint8Array with every 4 elements representing the RGBA data
+    .toPixelData($("#review_div")[0])
+    .then(data => {
+      // Construct an ImageData object from the pixel data
+      const node = $("#review_div")[0];
+      const w = node.scrollWidth;
+      const h = node.scrollHeight;
+      if (data.length != 4 * w * h)
+        throw new Error(`Ladder in my tights ${data.length} ${4*w*h} ${w} ${h}`);
+      const crop = trim(data, w, h);
+      BandW(data, w, h);
 
-    // render the cropped area to an ImageBitmap
-    const imageData = new ImageData(data, w, h);
-    return window.createImageBitmap(
-      imageData, 0, above, w, h - above - below);
-  })
-  .then(imageBitmap => {
-    // Render the cropped image onto the canvas
-    const canvas = $("#image_canvas")[0];
-    const w = canvas.width = imageBitmap.width;
-    const h = canvas.height = imageBitmap.height;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(imageBitmap, 0, 0);
-    $("#image_liner").height(h);
+      // render the cropped area to an ImageBitmap
+      const imageData = new ImageData(data, w, crop[1]);
+      return window.createImageBitmap(imageData, 0, crop[0], w, crop[1]);
+    })
+    .then(imageBitmap => {
+      $("#rendering_error").hide();
+      $("#rendering_info").show();
+      // Render the cropped image onto the canvas
+      const canvas = $("#image_canvas")[0];
+      const w = canvas.width = imageBitmap.width;
+      const h = canvas.height = imageBitmap.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(imageBitmap, 0, 0);
+      $("#image_liner").height(h);
 
-    $("#label_length_px").text(w);
-    $("#label_length_mm").text(w * info.pixel_width_mm);
+      $("#label_length_px").text(w);
+      $("#label_length_mm").text((w * info.pixel_width_mm).toFixed(2));
 
-    $("#label_width_px").text(h);
-    $("#label_width_mm").text(h * info.pixel_width_mm);
-    if (h > info.printable_width_px) {
-      $("#tape_div")
-      .css("top", 0)
-      .css("left", "0")
-      .css("height", `${info.printable_width_px}px`)
-      .show();
-    } else
-      $("#tape_div").hide();
-  })
-  .catch(error => {
-    console.error("Rendering error", error);
-  });
+      $("#label_width_px").text(h);
+      $("#label_width_mm").text((h * info.pixel_width_mm).toFixed(2));
+      if (h > info.printable_width_px) {
+        $("#tape_div")
+        .css("top", 0)
+        .css("left", "0")
+        .css("height", `${info.printable_width_px}px`)
+        .show();
+      } else
+        $("#tape_div").hide();
+    });
+  }, 100);
 }
 
 function onLabelChanged() {

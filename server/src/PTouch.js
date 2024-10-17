@@ -25,6 +25,7 @@ import fs from "node:fs";
 const Fs = fs.promises;
 import assert from "assert";
 import { PrinterStatus } from "./PrinterStatus.js";
+import { fromBinary } from "./Readable.js";
 
 // Send to clear the print buffer
 const INVALIDATE = new Uint8Array(200);
@@ -81,8 +82,7 @@ class PTouch {
    */
   write(buff) {
     const b = (buff instanceof Buffer) ? buff : Buffer.from(buff);
-    /* c8 ignore next */
-    this.debug("->", b);
+    //this.debug("->", b);
     return this.fd.write(b);
   }
 
@@ -97,8 +97,7 @@ class PTouch {
   read() {
     return this.fd.read(this.device)
     .then(data => {
-      /* c8 ignore next */
-      this.debug("<-", data);
+      //this.debug("<-", data);
       return data;
     });
   }
@@ -192,6 +191,7 @@ class PTouch {
     if (this.write_only)
       return Promise.resolve(this.status);
 
+    this.debug("Asking for status");
     return this.write(SEND_STATUS)
     .then(res => {
       //this.debug("WROTE", res.bytesWritten);
@@ -199,11 +199,13 @@ class PTouch {
     })
     .then(res => {
       if (res.bytesRead > 0) {
-        //this.debug("READ", res.bytesRead, res.buffer[0]);
         // Check for print head mark
-        if (res.buffer[0] === 0x80)
+        if (res.buffer[0] === 0x80) {
+          this.debug("\tread status");
           return this.status = new PrinterStatus(res.buffer, this.debug);
+        }
       }
+      this.debug("\tread nothing");
       // Recursively try again. Shouldn't take more than a
       // couple of tries. If it does then it'll blow up, but
       // that's OK.
@@ -284,7 +286,7 @@ class PTouch {
       this.debug(` Requires ${Math.ceil(width / this.status.printable_width_px)} tape runs`);
 
       // Split into tape lengths, each max printable_width_px wide
-      let offset = 0;
+      let offset = 0, x, bit;
       while (offset < width) {
         let printwidth = this.status.printable_width_px;
         if (offset + printwidth > width) {
@@ -306,8 +308,7 @@ class PTouch {
           let empty = true;
 
           // Pack leading padding
-          let x;
-          let bit = 7;
+          bit = 7;
           for (x = 0; x < padding; x++) {
             // Pack 8 pixels into a byte
             if (--bit < 0) {
@@ -316,31 +317,30 @@ class PTouch {
             }
           }
 
+          //const debugBM = [];
           // Pack bits from the image
           let byte = 0; // byte currently being packed
           for (x = 0; x < printwidth; x++) {
             if (isBlack(offset + x, y)) {
               // Fill byte from MSB
-              byte |= (1 << bit);
+              byte = byte | (1 << bit);
               empty = false;
-            }
+              //debugBM.push(`X${byte}`);
+            }// else debugBM.push(".");
 
             if (--bit < 0) { // byte is full
               raster[raster_byte++] = byte;
               byte = 0;
-              //bit = 7; // no need
+              bit = 7;
             }
           }
           raster[raster_byte++] = byte;
-
+          //this.debug(debugBM.join(""));
           if (empty) {
             // Some docs say this only works in compressed mode
-            this.debug("  empty raster");
-
+            //this.debug("  empty raster");
             buffer.push(EMPTY_RASTER);
           } else {
-            const da = Array.from(raster);
-            this.debug(`  raster ${da.map(b => Number(b).toString(16).padStart(2, "0"))}`);
             buffer.push(SEND_RASTER,
                         byte_count % 256,
                         Math.floor(byte_count / 256));
@@ -349,9 +349,10 @@ class PTouch {
         }
         // Increment for next tape length
         offset += printwidth;
-        // Despite what it says on the tin, print nofeed feeds the tape on the PT1230
-        //buffer.push(PRINT_NOFEED);
+
+        buffer.push(PRINT_NOFEED);
       }
+      console.log(fromBinary(buffer).join("\n"));
       return this.write(buffer);
     });
   }
