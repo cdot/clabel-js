@@ -67,7 +67,7 @@ function trim(data, w, h) {
   while (crop && top < h) {
     for (let x = 0; x < w; x++) {
       if (keep(data, (top * w + x) * 4)) {
-        console.debug(`First top keep at ${top},${x}`);
+        //console.debug(`First top keep at ${top},${x}`);
         crop = false;
         break;
       }
@@ -87,7 +87,7 @@ function trim(data, w, h) {
   while (crop && height > 0) {
     for (let x = 0; x < w; x++) {
       if (keep(data, ((top + height - 1) * w + x) * 4)) {
-        console.debug(`First bottom keep at ${height},${x}`);
+        //console.debug(`First bottom keep at ${height},${x}`);
         crop = false;
         break;
       }
@@ -133,42 +133,44 @@ function BandW(data, w, h) {
  * Render the review window to the image canvas.
  */
 function refreshImage() {
-  $("#rendering_error").text("Rendering").show();
-  $("#rendering_info").hide();
   setTimeout(() => {
+    const node = $("#review_div")[0];
+    const w = node.scrollWidth;
+    const h = node.scrollHeight;
     domtoimage
     // Get a Uint8Array with every 4 elements representing the RGBA data
-    .toPixelData($("#review_div")[0])
-    .then(data => {
-      // Construct an ImageData object from the pixel data
-      const node = $("#review_div")[0];
-      const w = node.scrollWidth;
-      const h = node.scrollHeight;
-      if (data.length != 4 * w * h)
-        throw new Error(`Ladder in my tights ${data.length} ${4*w*h} ${w} ${h}`);
-      const crop = trim(data, w, h);
-      BandW(data, w, h);
+    // Note this can be hit-and-miss - sometimes chunks of the label
+    // don't get rendered! Massaging the font size will generally bring
+    // them back.
+    .toCanvas(node, { width: w, height: h })
+    .then(dom_canvas => {
+      // Prepare the generated canvas for rendering
+      const dom_ctx = dom_canvas.getContext('2d');
+      const imageData = dom_ctx.getImageData(0, 0, w, h);
 
-      // render the cropped area to an ImageBitmap
-      const imageData = new ImageData(data, w, crop[1]);
-      return window.createImageBitmap(imageData, 0, crop[0], w, crop[1]);
-    })
-    .then(imageBitmap => {
-      $("#rendering_error").hide();
-      $("#rendering_info").show();
+      // Strip empty rows from top and bottom
+      const crop = trim(imageData.data, w, h);
+
+      // Monochromise the image
+      BandW(imageData.data, w, h);
+      dom_ctx.putImageData(imageData, 0, 0);
+
       // Render the cropped image onto the canvas
       const canvas = $("#image_canvas")[0];
-      const w = canvas.width = imageBitmap.width;
-      const h = canvas.height = imageBitmap.height;
+      $("#image_liner").width(canvas.width = w);
+      $("#image_liner").height(canvas.height = crop[1]);
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(imageBitmap, 0, 0);
-      $("#image_liner").height(h);
+      ctx.drawImage(dom_canvas, 0, crop[0], w, crop[1],
+                    0, 0, w, crop[1]);
 
       $("#label_length_px").text(w);
       $("#label_length_mm").text((w * info.pixel_width_mm).toFixed(2));
 
       $("#label_width_px").text(h);
       $("#label_width_mm").text((h * info.pixel_width_mm).toFixed(2));
+
+      // If multiple tape runs are required, show the bounds of the
+      // first tape run
       if (h > info.printable_width_px) {
         $("#tape_div")
         .css("top", 0)
