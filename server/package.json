@@ -5,21 +5,22 @@
     "description": "CLabel",
     "main": "main.js",
     "scripts": {
-        "start": "electron .",
-        "test": "echo \"Error: no test specified\" && exit 1"
+		"test": "mocha --recursive --extension js --timeout=5000 test"
     },
     "dependencies": {
         "cors": "^2.8.5",
         "express": "^4.21.1",
-        "morgan": "^1.10.0",
         "posix-getopt": "^1.2.1",
-        "rw-stream": "^0.3.3",
-        "sharp": "^0.33.5",
-        "socket.io": "^4.8.0"
+        "sharp": "^0.33.5"
     },
     "devDependencies": {
         "assert": "^2.1.0",
         "chai": "^5.1.1",
-        "mocha": "^10.7.3"
-    }
+        "mocha": "^10.7.3",
+        "tmp-promise": "^3.0.3"
+    },
+  "scripts": {
+	"lint": "eslint src -f unix",
+	"test": "mocha --recursive --extension js --timeout=5000 test"
+  }
 }
