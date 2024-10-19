@@ -1,14 +1,17 @@
 /*Copyright (C) 2024 Crawford Currie http://c-dot.co.uk*/
-import { promises as Fs } from "fs";
+/* eslint-env node */
+/* global Buffer*/
+/* global process */
+
 import Path from "path";
 import Cors from "cors";
 import Express from "express";
+import { Server as SocketServer } from "socket.io";
 import HTTP from "http";
 // Using Sharp for image processing
 import Sharp from "sharp";
 
 import { PTouch } from "./PTouch.js";
-import { PTouchStub } from "./PTouchStub.js";
 
 // Header for a base64 encoded PNG datUrl
 const PNGhead = "data:image/png;base64,";
@@ -38,10 +41,10 @@ class Server {
     .rotate(90)
     .raw()
     .toBuffer({ resolveWithObject: true })
-    .then(({ data, info }) => {     
-      return this.printer.printImage(
-        data, info.width, info.height, info.channels);
-    });
+    .then(({ data, info }) =>
+      this.printer.printImage(data, info.width, info.height, info.channels))
+    .then(() => this.printer.awaitPrinted())
+    .then(() => res.status(200).send("Printed"));
   }
 
   /**
@@ -55,7 +58,7 @@ class Server {
    * Eject the tape from the printer
    * @private
    */
-  POST_eject(req, res) {
+  POST_eject() {
     this.printer.eject();
   }
 
@@ -65,6 +68,7 @@ class Server {
    * @param {function?} params.debug debug print function
    * @param {boolean?} params.write_only passed to printer, to disable
    * bidirectional comms.
+   * @param {Model?} params.model printer model, required if write_only
    */
   constructor(params = {}) {
 
@@ -146,10 +150,17 @@ class Server {
   listen(port, host = "localhost") {
     // Don't start the server until the printer has successfully been
     // initialised
+    this.debug("Initialising printer");
     this.printer.initialise()
     .then(() => {
+      this.debug("Printer initialised");
       // Could also use HTTPS, but why bother?
       const protocol = HTTP.Server(this.express);
+      const io = new SocketServer(protocol);
+      this.printer.on(
+        PTouch.PRINTER_STATE_CHANGE,
+        // broadcast to all listeners
+        state => io.emit("Status", state));
       protocol.listen(port, host);
     });
   }

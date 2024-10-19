@@ -1,4 +1,6 @@
 /*Copyright (C) 2024 Crawford Currie http://c-dot.co.uk*/
+/* eslint-env node */
+/* global Buffer */
 
 /**
  * Decode a byte buffer full of PTouch print commands to a simple
@@ -6,7 +8,7 @@
  */
 function fromBinary(buff) {
   let output = [];
-  let i = 0;
+  let i = 0, fa, length, s;
   while (i < buff.length) {
     switch (buff[i++]) {
     case 0x00:
@@ -26,7 +28,7 @@ function fromBinary(buff) {
           output.push(`Raster_mode ${buff[i++]}`);
           continue;
         case 0x64:
-          const fa = buff[i++];
+          fa = buff[i++];
           output.push(`Feed ${fa + buff[i++] * 256}`);
           continue;
         default:
@@ -39,9 +41,9 @@ function fromBinary(buff) {
     case 0x5A: output.push(`Empty_raster`); continue;
     case 0x4D: output.push(`Compress ${buff[i++]}`); continue;
     case 0x47:
-      let length = buff[i++];
+      length = buff[i++];
       length += buff[i++] * 256;
-      let s = "";
+      s = "";
       for (let j = 0; j < length; j++)
         s += Number(buff[i++]).toString(16).padStart(2, "0");
       output.push(`Raster ${s}`);
@@ -60,7 +62,6 @@ function fromBinary(buff) {
  */
 function toBinary(commands) {
   const buff = [];
-  let v;
   for (const command of commands) {
     let cmd = command.split(/\s+/);
     const verb = cmd[0];

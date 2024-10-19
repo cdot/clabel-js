@@ -1,4 +1,6 @@
 /*Copyright (C) 2024 Crawford Currie http://c-dot.co.uk*/
+/* eslint-env node */
+/* global Buffer */
 
 /**
  * Support for a Brother P-Touch printers, only tested with PT1230PC
@@ -21,58 +23,77 @@
  * treated as write-only.
  */
 
-import fs from "node:fs";
-const Fs = fs.promises;
-import assert from "assert";
+import { promises as Fs } from "node:fs";
+import { EventEmitter } from "node:events";
+
 import { PrinterStatus } from "./PrinterStatus.js";
-import { fromBinary } from "./Readable.js";
+import { Model, Models } from "./Models.js";
+import { fromBinary } from "./Readable.js"; // debugging
 
-// Send to clear the print buffer
-const INVALIDATE = new Uint8Array(200);
-INVALIDATE.fill(0x00/*NULL*/);
+/**
+ * Commands used to control a PTouch printer. See the references.
+ */
+const Commands = {
+  // Send to clear the print buffer
+  INVALIDATE: 0x00,
 
-// Also used to cancel printing
-const INITIALISE_CLEAR = [ 0x1B/*ESC*/, 0x40/*@*/ ];
+  // Also used to cancel printing
+  INITIALISE_CLEAR: [ 0x1B/*ESC*/, 0x40/*@*/ ],
 
-// Status request, response is analysed below
-const SEND_STATUS = [ 0x1B/*ESC*/, 0x69/*i*/, 0x53/*S*/ ];
+  // Status request, response is analysed below
+  SEND_STATUS: [ 0x1B/*ESC*/, 0x69/*i*/, 0x53/*S*/ ],
 
-// PT500 doc says "sets printer to raster mode" for
-// 0x1B 0x69 0x61 0x01 and doesn't mention SET_RASTER_MODE
-//DYNAMIC_COMMAND_MODE = [ 0x1B/*ESC*/, 0x69/*i*/, 0x61/*a*/ ]
+  // PT500 doc says "sets printer to raster mode" for
+  // 0x1B 0x69 0x61 0x01 and doesn't mention SET_RASTER_MODE
+  // 0x1B 0x69 0x61 0x09 is ESC/P mode
+  // Not used
+  DYNAMIC_COMMAND_MODE: [ 0x1B/*ESC*/, 0x69/*i*/, 0x61/*a*/ ],
 
-//PRINT_INFORMATION = [ 0x1B/*ESC*/, 0x69/*i*/, 0x7A/*z*/ ]
+  // Not used
+  PRINT_INFORMATION: [ 0x1B/*ESC*/, 0x69/*i*/, 0x7A/*z*/ ],
 
-//MODE = [ 0x1B/*ESC*/, 0x69/*i*/, 0x4D/*M*/ ]
+  // Not used
+  MODE: [ 0x1B/*ESC*/, 0x69/*i*/, 0x4D/*M*/ ],
 
-// Follow with 1 byte 0=uncompressed, 2=TIFF
-const COMPRESSION = [ 0x4D/*M*/ ];
+  // Follow with 1 byte 0=uncompressed, 2=TIFF
+  COMPRESSION: [ 0x4D/*M*/ ],
 
-//ADVANCED_MODE = [ 0x1B/*ESC*/, 0x69/*i*/, 0x4B/*K*/ ]
+  // Not used
+  ADVANCED_MODE: [ 0x1B/*ESC*/, 0x69/*i*/, 0x4B/*K*/ ],
 
-// Follow with 2 bytes, b1+b2*256 dots
-// https://support.brother.com/g/b/spec.aspx?c=gb&lang=en&prod=1230euk says
-// "Tape margin settings Large (24.4mm) / Small (4mm)"
-const FEED_AMOUNT = [ 0x1B/*ESC*/, 0x69/*i*/, 0x64/*d*/ ];
+  // Follow with 2 bytes, b1+b2*256 dots
+  // https://support.brother.com/g/b/spec.aspx?c=gb&lang=en&prod=1230euk says
+  // "Tape margin settings Large (24.4mm) / Small (4mm)"
+  // Not used
+  FEED_AMOUNT: [ 0x1B/*ESC*/, 0x69/*i*/, 0x64/*d*/ ],
 
-//Not supported PAGE_NUMBER: [ 0x1B/*ESC*/, 0x69/*i*/, 0x41/*A*/ ],
+  // Not used
+  PAGE_NUMBER: [ 0x1B/*ESC*/, 0x69/*i*/, 0x41/*A*/ ],
 
-//Not supported AUTO_STATUS: [ 0x1B/*ESC*/, 0x69/*i*/, 0x21/*!*/ ],
+  // Not used
+  AUTO_STATUS: [ 0x1B/*ESC*/, 0x69/*i*/, 0x21/*!*/ ],
 
-const SET_RASTER_MODE = [ 0x1B/*ESC*/, 0x69/*i*/, 0x52/*R*/ ];
+  SET_TRANSFER_MODE: [ 0x1B/*ESC*/, 0x69/*i*/, 0x52/*R*/ ],
 
   // Print with feeding
-const PRINT_FEED = 0x1A/*SUB/Ctrl+Z*/;
+  // Not used
+  PRINT_FEED: 0x1A/*SUB/Ctrl+Z*/,
 
-  // Not supposed to feed the tape, but it does! Grr.
-const PRINT_NOFEED = 0x0C/*FF*/;
+  // Don't feed the tape
+  PRINT_NOFEED: 0x0C/*FF*/,
 
-const SEND_RASTER = 0x47/*G*/;
+  RASTER_DATA: 0x47/*G*/, // SMELL: PTP700 document says 'g' 0x67?
 
-  // PTP900 manual says this is raster mode only!
-const EMPTY_RASTER = 0x5A/*Z*/;
+  // PTP900 manual says this is raster mode only! But it works, so...
+  EMPTY_RASTER: 0x5A/*Z*/
+};
 
-class PTouch {
+class PTouch extends EventEmitter {
+
+  /**
+   * Event emitted by the printer when it detects a status change
+   */
+  static PRINTER_STATE_CHANGE = "StatusChanged";
 
   /**
    * Write to the device.
@@ -105,12 +126,12 @@ class PTouch {
   /**
    * @param {object} params setup parameters
    * @param {String} params.device device name (e.g. /dev/usb/lp0)
-   * @param {String} params.model printer model name (e.g. "PT1230"). If the
-   * name ends with "_F", the device will be treated as a write-only
-   * file e.g. "PT1230_F".
+   * @param {Model} params.model printer model.
    * @param {function?} params.debug function e.g. console.debug
    */
   constructor(params = {}) {
+
+    super();
 
     /**
      * Report function
@@ -130,11 +151,12 @@ class PTouch {
     /**
      * Device model
      */
-    this.model = params.model
-    ? PrinterStatus.getModelByName(params.model)
-    : PrinterStatus.getModelByName("PT1230");
-    if (!this.model)
-      throw Error(`Bad model "${params.model}"`);
+    if (params.model instanceof Model)
+      this.model = params.model;
+    else if (typeof params.model === "string")
+      this.model = Models.getModelByName(params.model);
+    else
+      this.model = Models.default();
 
     /**
      * Current printer status will be read from the printer during
@@ -145,20 +167,24 @@ class PTouch {
     this.status = PrinterStatus.from(this.model.defaultStatus);
     this.status.model = this.model.name;
 
-    this.debug(`Printer type ${this.model.name}`);
+    console.log(`Printer type ${this.model.name}`);
+
     /**
      * Flag indicating if the device can be interrogated for status
      * information.
      */
-    this.write_only = params.model
-    ? params.model.endsWith("_F")
-    : false;
+    this.write_only = params.write_only;
 
     /**
      * Flag to indicate successult device initialisation
      * @private
      */
     this.initialised = false;
+
+    /**
+     * @private
+     */
+    this.statusBlock = [];
   }
 
   /**
@@ -177,7 +203,10 @@ class PTouch {
    * @return {Promise.<this>} promise resolving to this
    */
   reset() {
-    return this.write([ ...INVALIDATE, ...INITIALISE_CLEAR ])
+    const buff = new Uint8Array(200);
+    buff.fill(Commands.INVALIDATE);
+    buff[buff.length - 1] = Commands.INITIALISE_CLEAR;
+    return this.write(buff)
     .then(() => this);
   }
 
@@ -192,25 +221,7 @@ class PTouch {
       return Promise.resolve(this.status);
 
     this.debug("Asking for status");
-    return this.write(SEND_STATUS)
-    .then(res => {
-      //this.debug("WROTE", res.bytesWritten);
-      return this.read();
-    })
-    .then(res => {
-      if (res.bytesRead > 0) {
-        // Check for print head mark
-        if (res.buffer[0] === 0x80) {
-          this.debug("\tread status");
-          return this.status = new PrinterStatus(res.buffer, this.debug);
-        }
-      }
-      this.debug("\tread nothing");
-      // Recursively try again. Shouldn't take more than a
-      // couple of tries. If it does then it'll blow up, but
-      // that's OK.
-      return this.getStatusReport();
-    });
+    return this.write(Commands.SEND_STATUS);
   }
 
   /**
@@ -229,22 +240,88 @@ class PTouch {
       this.fd = fd;
       return this.reset();
     })
-    .then(() => this.write_only ? Promise.resolve(this) : this.getStatusReport())
-    .then(() => {
-      this.initialised = true;
-      return this;
-    });
+    // start polling for status changes
+    .then(() => this.pollStatus())
+    // Force a status report
+    .then(() => this.write(Commands.SEND_STATUS))
+    .then(() => new Promise(resolve => {
+      this.once(PTouch.PRINTER_STATE_CHANGE, state => {
+        const buffer = [ ...Commands.COMPRESSION, 0, // uncompressed
+                         ...Commands.SET_TRANSFER_MODE, 1 // raster
+                       ];
+        this.initialised = true;
+        resolve(this.write(buffer));
+      });
+    }));
   }
 
   /**
-   * Promise to Eject the tape
+   * Promise to Eject the tape. This is done by printing empty
+   * rasters, rather than using PRINT_FEED, as the latter wastes
+   * too much tape and I can't work out how to control it.
    * @return {Promise} Promise that resolves to undefined
    */
   eject() {
     this.debug(`PTouch: Eject ${this.status.eject_px} rasters`);
-    const buff = Buffer.alloc(this.status.eject_px + 1, EMPTY_RASTER);
-    buff[buff.length - 1] = PRINT_NOFEED;
+    const buff = Buffer.alloc(this.status.eject_px + 1, Commands.EMPTY_RASTER);
+    buff[buff.length - 1] = Commands.PRINT_NOFEED;
     return this.write(buff);
+  }
+
+  /**
+   * The only thing (of interest) that ever comes from the printer after a
+   * print command has been sent is a sequence of status blocks,
+   * each 32 bytes. Whenever we get a status block, we raise a "Status"
+   * event, passing the new status block.
+   * @private
+   */
+  pollStatus(started) {
+    if (this.write_only)
+      return;
+
+    if (!started)
+      this.debug("Started polling for status updates");
+    this.read()
+    .then(reply => {
+      if (reply.bytesRead > 0) {
+        let i = 0;
+        while (i < reply.bytesRead) {
+          if (this.statusBlock.length > 0) {
+            this.statusBlock.push(reply.buffer[i]);
+            if (this.statusBlock.length === 32) {
+              this.status = new PrinterStatus(this.statusBlock, this.debug);
+              this.statusBlock = [];
+              this.emit(PTouch.PRINTER_STATE_CHANGE, this.status);
+            }
+          } else if (reply.buffer[i] !== 0) {
+            this.readingStatus = true;
+            this.statusBlock = [ reply.buffer[i] ];
+          }
+          i++;
+        }
+      }
+      setTimeout(() => this.pollStatus(true), 200);
+    });
+  }
+
+  /**
+   * Wait for the printer status to switch to "Printing complete"
+   * @return {Promise} promise that resolves when status "Printing complete"
+   * has been seen.
+   */
+  awaitPrinted() {
+    if (this.write_only)
+      return Promise.resolve();
+
+    return new Promise(resolve => this.on("Status", to =>
+      {
+        if (to.status_type === "Printing complete") {
+          this.debug("Saw Printing complete");
+          this.removeAllListeners("Status");
+          resolve();
+        }
+        console.error(to);
+      }));
   }
 
   /**
@@ -279,9 +356,7 @@ class PTouch {
       this.debug(`\tStart padding ${padding}px (${padding / 8} bytes)`);
 
       // The print buffer
-      const buffer = [ ...COMPRESSION, 0, // uncompressed
-                       ...SET_RASTER_MODE, 1,
-                       ...FEED_AMOUNT, 0, 0 ];
+      const buffer = [];
 
       this.debug(` Requires ${Math.ceil(width / this.status.printable_width_px)} tape runs`);
 
@@ -337,11 +412,9 @@ class PTouch {
           raster[raster_byte++] = byte;
           //this.debug(debugBM.join(""));
           if (empty) {
-            // Some docs say this only works in compressed mode
-            //this.debug("  empty raster");
-            buffer.push(EMPTY_RASTER);
+            buffer.push(Commands.EMPTY_RASTER);
           } else {
-            buffer.push(SEND_RASTER,
+            buffer.push(Commands.RASTER_DATA,
                         byte_count % 256,
                         Math.floor(byte_count / 256));
             buffer.push(...raster);
@@ -350,7 +423,13 @@ class PTouch {
         // Increment for next tape length
         offset += printwidth;
 
-        buffer.push(PRINT_NOFEED);
+        // push the label gap of empty rasters. Without this,
+        // the printer loses several rasters off the end of the
+        // print.
+        for (let i = 0; i < this.status.label_gap_px; i++)
+          buffer.push(Commands.EMPTY_RASTER);
+
+        buffer.push(Commands.PRINT_NOFEED);
       }
       console.log(fromBinary(buffer).join("\n"));
       return this.write(buffer);

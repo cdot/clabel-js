@@ -10,7 +10,8 @@
     },
     "dependencies": {
         "dom-to-image-more": "^3.5.0",
-        "jquery": "^3.6.3"
+        "jquery": "^3.6.3",
+        "socket.io": "^4.8.0"
     },
     "devDependencies": {
         "assert": "^2.1.0",

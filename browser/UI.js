@@ -2,7 +2,7 @@
 /* eslint-env browser */
 
 /**
- * User interface to capture HTML defintions of labels that can then
+ * User interface to capture HTML definitions of labels that can then
  * be sent (as images) to a label printer server.
  */
 
@@ -248,9 +248,7 @@ $(function() {
 
   $("#print").on("click", function() {
     $.post("/ajax/print", { png: $("#image_canvas")[0].toDataURL() })
-    .then(res => {
-      alert(res);
-    });
+    .then(res => $("#printer_status").text(res));
   });
 
   $("#alpha_threshold").on("change", function() {
@@ -268,10 +266,15 @@ $(function() {
   });
 
   $.get("/ajax/info", info => {
-    console.debug("Received INFO", info);
     setInfo(info);
   });
 
   onLabelChanged();
+
+  const socket = io();
+  socket.on("Status", state => {
+    setInfo(state);
+    console.log("Status", state);
+  });
 });
 

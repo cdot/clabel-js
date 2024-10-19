@@ -9,7 +9,7 @@
     <title>clabel</title>
     <link rel="icon" href="clabel.svg" type="image/x-icon" />
     <link href="./styles.css" rel="stylesheet" type="text/css">
-    <!--link id="jQueryTheme" href="./node_modules/jquery-ui/dist/themes/pepper-grinder/jquery-ui.min.css" rel="stylesheet" type="text/css" -->
+    <script src="./node_modules/socket.io/client-dist/socket.io.js"></script>
     <script src="./node_modules/jquery/dist/jquery.min.js"></script>
     <script src="./node_modules/dom-to-image-more/dist/dom-to-image-more.min.js"></script>
     <script src="./UI.js" type="module"></script>
@@ -20,6 +20,9 @@
     </h1>
     <h2 id="info">
       Printer model <span class="text-model"></span>, Tape width <span class="text-media_width_mm"></span>mm, <span data-tooltip="The printable width gives the maximum height for the label that can be printed.">Printable width <span class="text-printable_width_mm"></span>mm (<span class="text-printable_width_px"></span>px)</span>
+      <div>
+        Status: <span class="text-phase">Unknown</span>
+      </div>
     </h2>
     <div>
       <div id="textarea_controls" class="bordered-box">
