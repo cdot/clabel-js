@@ -19,9 +19,9 @@
       <img src="c.logo.png" style="height:60px;display:inline-box">label
     </h1>
     <h2 id="info">
-      Printer model <span class="text-model"></span>, Tape width <span class="text-media_width_mm"></span>mm, <span data-tooltip="The printable width gives the maximum height for the label that can be printed.">Printable width <span class="text-printable_width_mm"></span>mm (<span class="text-printable_width_px"></span>px)</span>
+      Printer model <span class="model_name"></span>, Tape width <span class="media_width_mm"></span>mm, <span data-tooltip="The printable width gives the maximum height for the label that can be printed.">Printable width <span class="printable_width_mm"></span>mm (<span class="printable_width_px"></span>px)</span>
       <div>
-        Status: <span class="text-phase">Unknown</span>
+        Status: <span class="phase">Unknown</span>
       </div>
     </h2>
     <div>
@@ -50,7 +50,7 @@
     <h2 data-tooltip="This is your HTML rendered in the browser">
       Review
     </h2>
-    <div id="review_liner" class="min-height-media_width_px">
+    <div id="review_liner">
       <div id="review_div" class="font-family-sanserif">strip</div>
     </div>
     <h2 data-tooltip="This is the actual bitmap that will be sent to the printer. If the image is wider than the printable area of the tape, the image will be split over multiple lengths of tape. A green box will appear showing the width of the first tape length">

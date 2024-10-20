@@ -5,48 +5,25 @@
  * User interface to capture HTML definitions of labels that can then
  * be sent (as images) to a label printer server.
  */
+import { PTouchStatus } from "./PTouchStatus.js";
 
 /* global domtoimage */
 
-// Last info received from the server. This describes the printer.
-let info = {
-  model: "Unknown",
-  pixel_width_mm: 0,
-  eject_px: 0,
-  eject_mm: 0,
-  raster_px: 0,
-  raster_mm: 0,
-  printable_width_px: 0,
-  printable_width_mm: 0,
-  media_width_px: 0,
-  media_width_mm: 0,
-  phase: "Uninitialised"
-};
-
+// Last status received from the server. This describes the printer.
+let currentStatus = new PTouchStatus();
 // Thresholds for colour conversion, tunable per image
 let alphaThreshold = 30;
 let colourThreshold = 30;
 
-/**
- * Get the current selection in the textarea. If start and end
- * are the same, there is no selection. The selection persists
- * when the textarea no longer has the focus, and only gets
- * cleared when it regains the focus.
- */
-function getTextSelection() {
-  const txtarea = $("#label_text")[0];
-  return {
-    start: txtarea.selectionStart,
-    end: txtarea.selectionEnd
-  };
-}
-
-function setInfo(n) {
-  info = n;
-  for (const f of Object.keys(info)) {
-    $(`.text-${f}`).text(info[f]);
-    $(`.min-height-${f}`).css("min-height", `${info[f]}px`);
-  }
+// Update printer status information fields
+function setStatus(s) {
+  currentStatus = s;
+  $(".model_name").text(s.model);
+  $(".media_width_mm").text(s.media_width_mm);
+  $(".printable_width_mm").text(s.printable_width_mm);
+  $(".printable_width_px").text(s.printable_width_px);
+  $(".phase").text(PTouchStatus.Phase[s.phase]);
+  $("#review_liner").css("min-height", s.media_width_px);
   refreshImage();
 }
 
@@ -172,18 +149,18 @@ function refreshImage() {
                     0, 0, w, crop[1]);
 
       $("#label_length_px").text(w);
-      $("#label_length_mm").text((w * info.pixel_width_mm).toFixed(2));
+      $("#label_length_mm").text((w * currentStatus.pixel_width_mm).toFixed(2));
 
       $("#label_width_px").text(h);
-      $("#label_width_mm").text((h * info.pixel_width_mm).toFixed(2));
+      $("#label_width_mm").text((h * currentStatus.pixel_width_mm).toFixed(2));
 
       // If multiple tape runs are required, show the bounds of the
       // first tape run
-      if (h > info.printable_width_px) {
+      if (h > currentStatus.printable_width_px) {
         $("#tape_div")
         .css("top", 0)
         .css("left", "0")
-        .css("height", `${info.printable_width_px}px`)
+        .css("height", `${currentStatus.printable_width_px}px`)
         .show();
       } else
         $("#tape_div").hide();
@@ -265,15 +242,15 @@ $(function() {
     $.post("/ajax/eject");
   });
 
-  $.get("/ajax/info", info => {
-    setInfo(info);
+  $.get("/ajax/status", currentStatus => {
+    setStatus(currentStatus);
   });
 
   onLabelChanged();
 
   const socket = io();
-  socket.on("Status", state => {
-    setInfo(state);
+  socket.on(PTouchStatus.UPDATE_EVENT, state => {
+    setStatus(state);
     console.log("Status", state);
   });
 });

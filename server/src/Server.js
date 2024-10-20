@@ -12,6 +12,7 @@ import HTTP from "http";
 import Sharp from "sharp";
 
 import { PTouch } from "./PTouch.js";
+import { PTouchStatus } from "./PTouchStatus.js";
 
 // Header for a base64 encoded PNG datUrl
 const PNGhead = "data:image/png;base64,";
@@ -20,8 +21,8 @@ const PNGhead = "data:image/png;base64,";
  * A server for printing labels on a PTouch label printer.
  * Routes:
  * - GET /<doc> - serve a static document
- * - GET /ajax/info - get information about the printer
- * - POST /ajax/print - print an image sent in a PNG dataurl
+ * - GET /ajax/status - get printer status (returns a PTouchStatus)
+ * - POST /ajax/print - print an image sent in a PNG dataurl,
  * - POST /ajax/eject - eject the tape so it can be cut
  */
 class Server {
@@ -48,9 +49,10 @@ class Server {
   }
 
   /**
-   * Handle an info request.
+   * Handle a request for the current printer status.
+   * @private
    */
-  GET_info(req, res) {
+  GET_status(req, res) {
     res.status(200).send(this.printer.status);
   }
 
@@ -64,11 +66,10 @@ class Server {
 
   /**
    * @param {object} params
-   * @param {string} params.device print device
-   * @param {function?} params.debug debug print function
-   * @param {boolean?} params.write_only passed to printer, to disable
-   * bidirectional comms.
    * @param {Model?} params.model printer model, required if write_only
+   * @param {string} params.device device name (e.g. /dev/usb/lp0) 
+   * @param {boolean?} params.write_only disable bidirectional comms
+   * @param {function?} params.debug debug print function
    */
   constructor(params = {}) {
 
@@ -77,6 +78,8 @@ class Server {
 
     /**
      * The printer
+     * @member {PTouch}
+     * @private
      */
     this.printer = new PTouch(params);
 
@@ -132,8 +135,8 @@ class Server {
       (req, res) => this.POST_print(req, res));
 
     cmdRouter.get(
-      "/ajax/info",
-      (req, res) => this.GET_info(req, res));
+      "/ajax/status",
+      (req, res) => this.GET_status(req, res));
 
     cmdRouter.post(
       "/ajax/eject",
@@ -143,11 +146,11 @@ class Server {
   }
 
   /**
-   * Start the server listing on the given port
+   * Start the server, listening on the given port
    * @param {number} port number
-   * @param {string?} host host name (default "localhost")
+   * @param {string} host host name
    */
-  listen(port, host = "localhost") {
+  listen(port = 9094, host = "localhost") {
     // Don't start the server until the printer has successfully been
     // initialised
     this.debug("Initialising printer");
@@ -157,10 +160,9 @@ class Server {
       // Could also use HTTPS, but why bother?
       const protocol = HTTP.Server(this.express);
       const io = new SocketServer(protocol);
-      this.printer.on(
-        PTouch.PRINTER_STATE_CHANGE,
-        // broadcast to all listeners
-        state => io.emit("Status", state));
+      // broadcast phase changes to all listeners
+      this.printer.on(PTouchStatus.UPDATE_EVENT,
+        state => io.emit(PTouchStatus.UPDATE_EVENT, state));
       protocol.listen(port, host);
     });
   }

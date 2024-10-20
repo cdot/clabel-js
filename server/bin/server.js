@@ -30,6 +30,7 @@ const go_parser = new getopt.BasicParser(
   "d:(device)h(help)m:(model)p:(port)v(verbose)w(write_only)",
   process.argv);
 
+// Option defaults
 const options = {
   port: 9094,
   docRoot: docRoot,

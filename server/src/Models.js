@@ -1,15 +1,6 @@
 /*Copyright (C) 2024 Crawford Currie http://c-dot.co.uk*/
 /* eslint-env node */
 
-/**
- * Model information gleaned from Brother documents and printers.
- * name: text name of the device
- * deviceCode: model code reported in status reports
- * defaultStatus: a default status block, for use when the device can't be read
- * from.
- * TODO: split this out into json files
- */
-
 const DEFAULT_PT1230 = {
   eject_mm: 10,
   raster_px: 128,
@@ -24,10 +15,13 @@ const DEFAULT_PT1230 = {
   media_width_mm: 12
 };
 
+/**
+ * Model information descriptor.
+ */
 class Model {
   constructor(deviceCode, name, defaultStatus) {
     /**
-     * Device idntifier code, as returned in a status report
+     * Device identifier code, as returned in a status report
      * @member {number}
      */
     this.deviceCode = deviceCode;
@@ -39,7 +33,8 @@ class Model {
     this.name = name;
 
     /**
-     * Block of default status info for this model.
+     * Block of default status info for this model. This is intended
+     * to be used as a template for PTouchStatus.from()
      * @member {object}
      */
     this.defaultStatus = defaultStatus;
@@ -67,13 +62,20 @@ const MODELS = [
   new Model(0x78, "PT-P910BT", DEFAULT_PT1230)
 ];
 
+/**
+ * Model information gleaned from Brother documents and printers.
+ * name: text name of the device
+ * deviceCode: model code reported in status reports
+ * defaultStatus: a default status block, for use when the device can't be read
+ * from.
+ * TODO: split this out into json files
+ */
 class Models {
 
   /**
    * Get the model by device code.
    * @param {number} code model device code to find
    * @return {object} object from the MODELS array above
-   * @private
    */
   static getModelByDeviceCode(code) {
     for (const m of MODELS) {
@@ -88,7 +90,6 @@ class Models {
    * the model name, so "PT1230PC", "PT1230F" will both match model "PT1230".
    * @param {string} name model name to find
    * @return {Model} object from the MODELS array above
-   * @private
    */
   static getModelByName(name) {
     for (const m of MODELS) {
