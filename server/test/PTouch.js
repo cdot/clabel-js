@@ -3,6 +3,7 @@
 import { promises as Fs } from "node:fs";
 import { assert } from "chai";
 import { PTouch } from "../src/PTouch.js";
+import { PTouchStatus } from "../src/PTouchStatus.js";
 import { Models } from "../src/Models.js";
 import { toBinary, fromBinary } from "../src/Readable.js";
 import tmp from 'tmp-promise';
@@ -48,19 +49,17 @@ describe("PTouch", () => {
       device: "/dev/usb/lp0"
     });
     return dev.initialise()
-    .then(() => dev.getStatusReport())
-    .then(status => {
+    .then(() => {
+      const status = dev.status;
       assert.equal(status.raster_px, 128);
       assert.equal(status.raster_mm, 18);
       assert.equal(status.printable_width_px, 64);
       assert.equal(status.printable_width_mm, 9);
-      assert.equal(status.phase, 'Receiving');
+      assert.equal(PTouchStatus.Phase[status.phase], "READY");
       assert.equal(status.model, 'PT1230');
-      assert.equal(status.media_type, 'Laminated');
+      assert.equal(PTouchStatus.MEDIA_TYPES[status.media_type], 'Laminated');
       assert.equal(status.media_width_mm, 12);
-      assert.equal(status.eject_mm, 20);
-      assert.equal(status.eject_px, 142);
-      assert.equal(status.pixel_width_mm, 0.140625);
+      assert.equal(status.pixel_size_mm, 0.140625);
       assert.equal(status.media_width_px, 85.33333333333333);
     })
     .then(() => dev.close())
@@ -89,13 +88,11 @@ describe("PTouch", () => {
         assert.equal(dev.status.raster_mm, 18);
         assert.equal(dev.status.printable_width_px, 64);
         assert.equal(dev.status.printable_width_mm, 9);
-        assert.equal(dev.status.phase, 'Initialisation');
+        assert(typeof dev.status.phase == "undefined");
         assert.equal(dev.status.model, 'PT1230');
         assert.equal(dev.status.media_type, 'Laminated');
         assert.equal(dev.status.media_width_mm, 12);
-        assert.equal(dev.status.eject_mm, 20);
-        assert.equal(dev.status.eject_px, 142);
-        assert.equal(dev.status.pixel_width_mm, 0.140625);
+        assert.equal(dev.status.pixel_size_mm, 0.140625);
         assert.equal(dev.status.media_width_px, 85.33333333333333);
       });
     });
@@ -123,7 +120,7 @@ describe("PTouch", () => {
         assert.equal(text[i++], "Initialise_clear");
         assert.equal(text[i++], "Compress 0");
         assert.equal(text[i++], "Raster_mode 1");
-        assert.equal(text[i++], "Feed 0");
+        assert.equal(text[i++], "Feed 64");
         assert.equal(text[i++], "Empty_raster");
         assert.equal(text[i++], "Empty_raster");
         assert.equal(text[i++], "Empty_raster");
@@ -189,7 +186,7 @@ describe("PTouch", () => {
         assert.equal(text[i++], "Initialise_clear");
         assert.equal(text[i++], "Compress 0");
         assert.equal(text[i++], "Raster_mode 1");
-        assert.equal(text[i++], "Feed 0");
+        assert.equal(text[i++], "Feed 64");
         assert.equal(text[i++], "Empty_raster");
         assert.equal(text[i++], "Empty_raster");
         assert.equal(text[i++], "Empty_raster");

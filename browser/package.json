@@ -1,8 +1,8 @@
 {
-    "name": "clabel-js",
+    "name": "clabel-js-browser",
     "version": "0.0.1",
     "type": "module",
-    "description": "CLabel",
+    "description": "CLabel browser app",
     "main": "main.js",
     "scripts": {
         "start": "electron .",

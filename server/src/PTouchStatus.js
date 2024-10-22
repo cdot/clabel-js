@@ -81,27 +81,24 @@ class PTouchStatus {
    * @private
    */
   deriveDimensions(debug = () => {}) {
-	  this.eject_px = Math.floor(
-      this.raster_px * this.eject_mm / this.raster_mm + 0.5);
+	  this.pixel_size_mm = this.raster_mm / this.raster_px;
 
-	  this.pixel_width_mm = this.raster_mm / this.raster_px;
-
-    this.media_width_px = this.media_width_mm / this.pixel_width_mm;
+    this.media_width_px = this.media_width_mm / this.pixel_size_mm;
 
     debug(`Tape is ${this.media_width_px}px (${this.media_width_mm}mm) wide\n`
           + `A raster is ${this.raster_px}px (${this.raster_mm}mm)\n`
           + `Max printable width is ${this.printable_width_px}px`
-          + `(${this.printable_width_px * this.pixel_width_mm}mm)`);
+          + `(${this.printable_width_px * this.pixel_size_mm}mm)`);
     
     if (this.media_width_px < this.printable_width_px) {
       this.printable_width_px =
-      this.media_width_mm / this.pixel_width_mm;
+      this.media_width_mm / this.pixel_size_mm;
       debug(`Tape is narrower than printable area. `
             + `Reducing printable area to `
             + `${this.printable_width_px}px for ${this.media_width_mm}mm media`);
     }
     this.printable_width_mm = 
-    this.printable_width_px * this.pixel_width_mm;
+    this.printable_width_px * this.pixel_size_mm;
   }
 
   /**
@@ -224,13 +221,6 @@ class PTouchStatus {
   constructor(raw, debug = () => {}) {
     
     /**
-     * Number of mm of tape to emit to cause an eject.
-     * From model defaultStatus.
-     * @member {number}
-     */
-    this.eject_mm = 0;
-
-    /**
      * Number of pixels in a raster line. From model defaultStatus.
      * @member {number}
      */
@@ -272,16 +262,11 @@ class PTouchStatus {
     this.media_width_mm = 0;
 
     /**
-     * Number of rasters to emit to cause an eject. Derived.
+     * Width/height of a single pixel in mm. Derived, assuming
+     * pixels are square.
      * @member {number}
      */
-	  this.eject_px = 0;
-
-    /**
-     * Width of a single pixel in mm. Derived.
-     * @member {number}
-     */
-    this.pixel_width_mm = 0;
+    this.pixel_size_mm = 0;
 
     /**
      * Width of tape media in px. Derived.

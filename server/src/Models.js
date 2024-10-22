@@ -2,7 +2,7 @@
 /* eslint-env node */
 
 const DEFAULT_PT1230 = {
-  eject_mm: 10,
+  // Number of rasters (though not all will have pins!)
   raster_px: 128,
   // Must be 18mm even though the PT1230 only supports up to 12mm tape.
   raster_mm: 18,
@@ -51,7 +51,6 @@ const MODELS = [
   new Model(0x69, "PT-P900W", DEFAULT_PT1230),
   new Model(0x70, "PT-P950NW", DEFAULT_PT1230),
   new Model(0x71, "PT-P900", {
-    eject_mm: 20,
     raster_px: 512,
     raster_mm: 36,
     printable_width_px: 454,

@@ -23,7 +23,7 @@ const PNGhead = "data:image/png;base64,";
  * - GET /<doc> - serve a static document
  * - GET /ajax/status - get printer status (returns a PTouchStatus)
  * - POST /ajax/print - print an image sent in a PNG dataurl,
- * - POST /ajax/eject - eject the tape so it can be cut
+ * - POST /ajax/eject?px=<px> - eject the tape so it can be cut
  */
 class Server {
 
@@ -44,7 +44,6 @@ class Server {
     .toBuffer({ resolveWithObject: true })
     .then(({ data, info }) =>
       this.printer.printImage(data, info.width, info.height, info.channels))
-    .then(() => this.printer.awaitPrinted())
     .then(() => res.status(200).send("Printed"));
   }
 
@@ -60,8 +59,10 @@ class Server {
    * Eject the tape from the printer
    * @private
    */
-  POST_eject() {
-    this.printer.eject();
+  POST_eject(req, res) {
+    const px = req.query.px;
+    this.printer.eject(parseInt(px))
+    .then(() => res.status(200).send(`Ejected ${px} rasters!`));
   }
 
   /**
@@ -156,13 +157,16 @@ class Server {
     this.debug("Initialising printer");
     this.printer.initialise()
     .then(() => {
-      this.debug("Printer initialised");
+      console.log("Status", PTouchStatus.Phase[this.printer.status.phase]);
       // Could also use HTTPS, but why bother?
       const protocol = HTTP.Server(this.express);
       const io = new SocketServer(protocol);
       // broadcast phase changes to all listeners
       this.printer.on(PTouchStatus.UPDATE_EVENT,
-        state => io.emit(PTouchStatus.UPDATE_EVENT, state));
+                      state => {
+                        console.log(PTouchStatus.Phase[state.phase]);
+                        io.emit(PTouchStatus.UPDATE_EVENT, state);
+                      });
       protocol.listen(port, host);
     });
   }

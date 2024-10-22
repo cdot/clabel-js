@@ -1,13 +1,14 @@
 {
-    "name": "clabel-js",
+    "name": "clabel-js-server",
     "version": "0.0.1",
     "type": "module",
-    "description": "CLabel",
+    "description": "CLabel server",
     "main": "main.js",
     "scripts": {
         "lint": "eslint src -f unix",
         "doc": "jsdoc -c jsdoc_config.json src",
-        "test": "mocha --recursive --extension js --timeout=5000 test"
+      "test": "mocha --recursive --extension js --timeout=5000 test",
+      "run": "node bin/server.js"
     },
     "dependencies": {
         "cors": "^2.8.5",

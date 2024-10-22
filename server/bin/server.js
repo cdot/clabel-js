@@ -16,14 +16,14 @@ const DESCRIPTION = [
   "DESCRIPTION",
   "\tRun a label print server for a Brother label printer",
   "OPTIONS",
-  "\t-d, --device <path> - path to printer (default /dev/usb/lp0.",
+  "\t-d, --device <path> - path to printer (default /dev/usb/lp0)",
   "\t-m, --model <model> - Set the printer type e.g. --model PT1230",
-  "\t\tIf the --model is not set, the --device will be interrogated.",
+  "\t\tIf the model is not specified, the --device will be interrogated",
+  "\t\t--model is required if --write_only is given",
   "\t-h, --help - output this information",
   "\t-p, --port <file> - Port to start server on (default 9094)",
   "\t-w, --write_only - only write, don't try to read from the device",
-  "\t\t--model is required in this case",
-  "\t-v, --verbose -  (prints to console.debug)"
+  "\t-v, --verbose - (prints to console.debug)"
 ].join("\n");
 
 const go_parser = new getopt.BasicParser(

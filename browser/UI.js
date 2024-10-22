@@ -14,6 +14,8 @@ let currentStatus = new PTouchStatus();
 // Thresholds for colour conversion, tunable per image
 let alphaThreshold = 30;
 let colourThreshold = 30;
+let tightCrop = false;
+let ejectPx = 10;
 
 // Update printer status information fields
 function setStatus(s) {
@@ -23,7 +25,8 @@ function setStatus(s) {
   $(".printable_width_mm").text(s.printable_width_mm);
   $(".printable_width_px").text(s.printable_width_px);
   $(".phase").text(PTouchStatus.Phase[s.phase]);
-  $("#review_liner").css("min-height", s.media_width_px);
+  $("#review_liner").css("min-height", s.printable_width_px);
+  $("#eject_mm").text((ejectPx * s.pixel_size_mm).toFixed(2));
   refreshImage();
 }
 
@@ -117,7 +120,8 @@ function refreshImage() {
   setTimeout(() => {
     const node = $("#review_div")[0];
     const w = node.scrollWidth;
-    const h = node.scrollHeight;
+    let top = 0;
+    let h = node.scrollHeight;
     domtoimage
     // Get a Uint8Array with every 4 elements representing the RGBA data
     .toCanvas(node, {
@@ -133,26 +137,28 @@ function refreshImage() {
       const dom_ctx = dom_canvas.getContext('2d');
       const imageData = dom_ctx.getImageData(0, 0, w, h);
 
-      // Strip empty rows from top and bottom
-      const crop = trim(imageData.data, w, h);
+      if (tightCrop)
+        // Strip empty rows from top and bottom. This will centre
+        // the image in the tape.
+        [ top, h ] = trim(imageData.data, w, h);
 
       // Monochromise the image
       BandW(imageData.data, w, h);
       dom_ctx.putImageData(imageData, 0, 0);
 
-      // Render the cropped image onto the canvas
+      // Render the image onto the canvas
       const canvas = $("#image_canvas")[0];
       $("#image_liner").width(canvas.width = w);
-      $("#image_liner").height(canvas.height = crop[1]);
+      $("#image_liner").height(canvas.height = h);
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(dom_canvas, 0, crop[0], w, crop[1],
-                    0, 0, w, crop[1]);
+      ctx.drawImage(dom_canvas, 0, top, w, h,
+                    0, 0, w, h);
 
       $("#label_length_px").text(w);
-      $("#label_length_mm").text((w * currentStatus.pixel_width_mm).toFixed(2));
+      $("#label_length_mm").text((w * currentStatus.pixel_size_mm).toFixed(2));
 
       $("#label_width_px").text(h);
-      $("#label_width_mm").text((h * currentStatus.pixel_width_mm).toFixed(2));
+      $("#label_width_mm").text((h * currentStatus.pixel_size_mm).toFixed(2));
 
       // If multiple tape runs are required, show the bounds of the
       // first tape run
@@ -168,90 +174,117 @@ function refreshImage() {
   }, 100);
 }
 
-function onLabelChanged() {
+/**
+ * Handler for the label text changing
+ */
+function onLabelChanged(refresh = true) {
   const content = $("#label_text").val();
   $("#review_div").html(content);
-  refreshImage();
+  if (refresh) refreshImage();
 }
 
 /**
- * Set the font family for the current selection (if there is one)
- * or the whole document
+ * Handler for the font family changing
  */
-function setFontFamily(font) {
+function onFontFamilyChanged(refresh = true) {
   const classList = $('#review_div').attr('class').split(/\s+/);
   $.each(classList, function(index, item) {
     if (item.indexOf("font-family-") === 0) {
       $("#review_div").removeClass(item);
     }
   });
-
-  refreshImage();
+  $("#review_div").addClass(`font-family-${$("#select_font").val()}`);
+  if (refresh) refreshImage();
 }
 
-function setFontSize(size) {
+// Handler for the font size changing
+function onFontSizeChanged(refresh = true) {
+  const size = $("#font-size").val();
   $("#review_div").css("font-size", `${size}px`);
-  refreshImage();
+  if (refresh) refreshImage();
 }
 
-/**
- * Set the rendering alpha threshold
- */
-function setAlphaThreshold(th) {
-  alphaThreshold = th;
-  refreshImage();
+// Handler for the left margin changing
+function onLeftMarginChanged(refresh = true) {
+  const size = $("#left-margin").val();
+  $("#review_div").css("padding-left", `${size}px`);
+  if (refresh) refreshImage();
 }
 
-/**
- * Set the rendeing colour threshold
- */
-function setColourThreshold(th) {
-  colourThreshold = th;
-  refreshImage();
+// Handler for the left margin changing
+function onRightMarginChanged(refresh = true) {
+  const size = $("#right-margin").val();
+  $("#review_div").css("padding-right", `${size}px`);
+  if (refresh) refreshImage();
+}
+
+// Handler to set the rendering alpha threshold
+function onAlphaThresholdChanged(refresh = true) {
+  alphaThreshold = $("#alpha_threshold").val();
+  if (refresh) refreshImage();
+}
+
+// Handler to set the rendering colour threshold
+function onColourThresholdChanged(refresh = true) {
+  colourThreshold = $("#colour_threshold").val();
+  if (refresh) refreshImage();
+}
+
+// Handler to set cropping
+function onTightCropChanged(refresh = true) {
+  tightCrop = $("#tight_crop").is(":checked");
+  if (refresh) refreshImage();
+}
+
+// Handler to set eject
+function onEjectChanged(refresh = true) {
+  ejectPx = $("#eject_px").val();
+  $("#eject_px").text((ejectPx / currentStatus.pixel_size_mm).toFixed(2));
+  if (refresh) refreshImage();
 }
 
 $(function() {
   $("#label_text").on("keyup", onLabelChanged);
+  onLabelChanged(false);
 
-  $("#select_font").on("change", function() {
-    setFontFamily(this.value);
-  });
-  setFontFamily($("#select_font").val());
+  $("#select_font").on("change", onFontFamilyChanged);
+  onFontFamilyChanged(false);
     
-  $("#font-size").on("change", function() {
-    setFontSize(this.value);
-  });
-  setFontSize($("#font-size").val());
+  $("#font-size").on("change", onFontSizeChanged);
+  onFontSizeChanged(false);
+
+  $("#left-margin").on("change", onLeftMarginChanged);
+  onLeftMarginChanged(false);
+
+  $("#right-margin").on("change", onRightMarginChanged);
+  onRightMarginChanged(false);
+
+  $("#tight_crop").on("change", onTightCropChanged);
+  onTightCropChanged(false);
+
+  $("#alpha_threshold").on("change", onAlphaThresholdChanged);
+  onAlphaThresholdChanged(false);
+
+  $("#colour_threshold").on("change", onColourThresholdChanged);
+  onColourThresholdChanged(false);
+
+  $("#eject_px").on("change", onEjectChanged);
+  onEjectChanged(false);
 
   $("#print").on("click", function() {
     $.post("/ajax/print", { png: $("#image_canvas")[0].toDataURL() })
     .then(res => $("#printer_status").text(res));
   });
 
-  $("#alpha_threshold").on("change", function() {
-    setAlphaThreshold(this.value);
-  });
-  setAlphaThreshold($("#alpha_threshold").val());
+  $("#eject").on("click", () => $.post(`/ajax/eject?px=${ejectPx}`));
 
-  $("#colour_threshold").on("change", function() {
-    setColourThreshold(this.value);
-  });
-  setColourThreshold($("#colour_threshold").val());
-
-  $("#eject").on("click", function() {
-    $.post("/ajax/eject");
-  });
-
-  $.get("/ajax/status", currentStatus => {
-    setStatus(currentStatus);
-  });
-
-  onLabelChanged();
+  $.get("/ajax/status", setStatus);
 
   const socket = io();
   socket.on(PTouchStatus.UPDATE_EVENT, state => {
     setStatus(state);
     console.log("Status", state);
   });
-});
 
+  refreshImage();
+});

@@ -174,6 +174,12 @@ class PTouch extends EventEmitter {
     this.initialised = false;
 
     /**
+     * True as long as polling is required, set ot false to stop it
+     * @private
+     */
+    this.polling = false;
+    
+    /**
      * @private
      */
     this.statusBlock = [];
@@ -183,6 +189,8 @@ class PTouch extends EventEmitter {
    * Disconnect from the printer
    */
   close() {
+    // Shut down polling
+    this.polling = false;
     if (this.fd) {
       this.fd.close();
       this.fd = undefined;
@@ -211,12 +219,11 @@ class PTouch extends EventEmitter {
       inval.fill(Commands.INVALIDATE);
       return this.write([
         ...inval,
-        Commands.INITIALISE_CLEAR,
+        ...Commands.INITIALISE_CLEAR,
         // Docs don't say what the initial state is.
         // Try to be sure.
         ...Commands.COMPRESSION, 0, // uncompressed
-        ...Commands.SET_TRANSFER_MODE, 1, // raster
-        ...Commands.FEED_AMOUNT, 64, 0 // 64 dots (guess)
+        ...Commands.SET_TRANSFER_MODE, 1 // raster
       ]);
     })
     .then(() => {
@@ -236,6 +243,7 @@ class PTouch extends EventEmitter {
           resolve();
         });
         // Start polling
+        this.polling = true;
         this.pollStatus();
         this.debug("PTouch: polling started");
         // Request a first status report. This will be handled
@@ -248,12 +256,12 @@ class PTouch extends EventEmitter {
   /**
    * Promise to eject the tape. This is done by printing empty
    * rasters, rather than using PRINT_FEED, as it's not clear how
-   * to control it (though FEED_AMOUNT/PRINT_FEED look likely)
+   * to control it (PRINT_FEED doesn't respect FEED_AMOUNT)
    * @return {Promise} Promise that resolves to undefined
    */
-  eject() {
-    this.debug(`PTouch: Eject ${this.status.eject_px} rasters`);
-    const buff = Buffer.alloc(this.status.eject_px + 1, Commands.EMPTY_RASTER);
+  eject(px) {
+    this.debug(`PTouch: Eject ${px} rasters`);
+    const buff = Buffer.alloc(px + 1, Commands.EMPTY_RASTER);
     buff[buff.length - 1] = Commands.PRINT_NOFEED;
     return this.write(buff);
   }
@@ -269,6 +277,8 @@ class PTouch extends EventEmitter {
    * @private
    */
   pollStatus() {
+    if (!this.polling)
+      return;
 
     this.read()
     .then(reply => {
@@ -296,26 +306,8 @@ class PTouch extends EventEmitter {
         }
       }
       // Poll again in 1/5s
-      setTimeout(() => this.pollStatus(true), 200);
+      setTimeout(() => this.pollStatus(), 200);
     });
-  }
-
-  /**
-   * Wait for the printer status to switch to "Printing complete"
-   * @return {Promise} promise that resolves when status "Printing complete"
-   * has been seen.
-   */
-  awaitPrinted() {
-    if (this.write_only)
-      return Promise.resolve();
-
-    // Wait for the "printed" event. Not sure if this is better than
-    // status_type==PHASE_CHANGED + phase==READY
-    return new Promise(resolve =>
-      this.once(PTouchStatus.Type.PRINTED, status => {
-        this.debug(`PTouch: Printing complete ${status}`);
-        resolve();
-      }));
   }
 
   /**
@@ -424,7 +416,7 @@ class PTouch extends EventEmitter {
 
         buffer.push(Commands.PRINT_NOFEED);
       }
-      console.log(fromBinary(buffer).join("\n"));
+      //console.log(fromBinary(buffer).join("\n"));
       return this.write(buffer);
     });
   }
