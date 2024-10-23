@@ -7,7 +7,7 @@
     <!--meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'" />
     <meta http-equiv="X-Content-Security-Policy" content="default-src 'self'; script-src 'self'" / -->
     <title>clabel</title>
-    <link rel="icon" href="clabel.svg" type="image/x-icon" />
+    <link rel="icon" href="images/PT1230PC.svg" />
     <link href="./styles.css" rel="stylesheet" type="text/css">
     <script src="./node_modules/socket.io/client-dist/socket.io.js"></script>
     <script src="./node_modules/jquery/dist/jquery.min.js"></script>
@@ -16,7 +16,7 @@
   </head>
   <body>
     <h1 style="display:flex;align-items:center;">
-      <img src="c.logo.png" style="height:60px;display:inline-flex">label
+      <img src="images/c.logo.png" style="height:60px;display:inline-flex">label
     </h1>
     <h2 id="info">
       Printer model <span class="model_name">Unknown</span>, Tape width <span class="media_width_mm">unknown</span> mm, <span data-tooltip="The printable width gives the maximum height for the label that can be printed.">Printable width <span class="printable_width_mm">unknown</span> mm (<span class="printable_width_px">unknown</span> px)</span>
@@ -47,7 +47,7 @@
           <label for="right-margin" data-tooltip="Extra empty space to the right of the label.">Right margin</label>
           <input id="right-margin" class="three-digits" type="number" min="0" value="0"/> px
         </p>
-        <textarea id="label_text"></textarea>
+        <textarea id="label_text" spellcheck="false"></textarea>
       </div>
     </div>
     <h2 data-tooltip="This is your HTML rendered in the browser">

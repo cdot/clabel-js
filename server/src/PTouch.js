@@ -256,7 +256,9 @@ class PTouch extends EventEmitter {
   /**
    * Promise to eject the tape. This is done by printing empty
    * rasters, rather than using PRINT_FEED, as it's not clear how
-   * to control it (PRINT_FEED doesn't respect FEED_AMOUNT)
+   * to control it (PRINT_FEED doesn't respect FEED_AMOUNT).
+   * Despite the name, PRINT_NOFEED does in fact feed, just a small
+   * amount (could this be the FEED_AMOUNT?)
    * @return {Promise} Promise that resolves to undefined
    */
   eject(px) {
