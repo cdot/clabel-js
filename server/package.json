@@ -12,21 +12,21 @@
     },
     "dependencies": {
         "cors": "^2.8.5",
-        "express": "^4.22.1",
+        "express": "^5.2.1",
         "posix-getopt": "^1.2.1",
-        "sharp": "^0.33.5",
-        "socket.io": "^4.8.0"
+        "sharp": "^0.34.5",
+        "socket.io": "^4.8.3"
     },
     "devDependencies": {
-        "@eslint/js": "^9.12.0",
+        "@eslint/js": "^9.39.2",
         "assert": "^2.1.0",
-        "chai": "^5.1.1",
+        "chai": "^6.2.2",
         "docdash": "^2.0.2",
-        "eslint": "^9.12.0",
-        "eslint-formatter-unix": "^8.40.0",
-        "globals": "^15.11.0",
-        "jsdoc": "^4.0.4",
-        "mocha": "^10.7.3",
+        "eslint": "^9.39.2",
+        "eslint-formatter-unix": "^9.0.1",
+        "globals": "^17.0.0",
+        "jsdoc": "^4.0.5",
+        "mocha": "^11.7.5",
         "tmp-promise": "^3.0.3"
     }
 }
