@@ -13,7 +13,7 @@ import { EventEmitter } from "node:events";
 
 import { PTouchStatus } from "./PTouchStatus.js";
 import { Model, Models } from "./Models.js";
-import { fromBinary } from "./Readable.js"; // debugging
+//import { fromBinary } from "./Readable.js"; // debugging
 
 /**
  * Commands used to control a PTouch printer. See the references folder.
