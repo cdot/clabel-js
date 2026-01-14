@@ -28,7 +28,7 @@ h2 {
   text-align:left;
 }
 
-// Supported font families
+/* Supported font families */
 .font-family-serif {
   font-family: Times, "Times New Roman", Georgia, serif;
 }

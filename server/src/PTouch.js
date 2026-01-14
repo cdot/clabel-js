@@ -108,7 +108,7 @@ class PTouch extends EventEmitter {
    * @private
    */
   read() {
-    return this.fd.read(this.device)
+    return this.fd.read()
     .then(data => {
       //this.debug("<-", data);
       return data;
