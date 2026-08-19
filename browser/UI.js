@@ -95,7 +95,7 @@ function trimEmptyRows(data, w, h) {
 
   if (top >= h) {
     // still cropping when we reached the bottom of the image
-    console.debug("trimEmptyRows: Image is empty");
+    //console.debug("trimEmptyRows: Image is empty");
     return [ 0, h ];
   }
 
@@ -112,7 +112,7 @@ function trimEmptyRows(data, w, h) {
     }
     if (crop) height--;
   }
-  console.debug(`trimEmptyRows: (0, ${h}) to (${top},${height})`);
+  //console.debug(`trimEmptyRows: (0, ${h}) to (${top},${height})`);
   return [ top, height ];
 }
 
@@ -259,7 +259,7 @@ function showLabel() {
  */
 function label2UI() {
   for (const f of Object.keys(label)) {
-    console.debug(f,"=",label[f]);
+    //console.debug(f,"=",label[f]);
     const el = document.getElementById(f);
     el.value = label[f];
   }
@@ -273,7 +273,6 @@ function loadLoadables() {
   fetch(`/ajax/list`)
   .then(response => response.json())
   .then(json => {
-    console.log("Loadables",json);
     const loadables = document.getElementById("loadables");
     for (const loadable of json) {
       const el = document.createElement("option");
@@ -291,7 +290,7 @@ function addEventListeners() {
   function listen(event, id, field = "value") {
     document.getElementById(id).addEventListener(event, () => {
       label[id] = document.getElementById(id)[field];
-      console.debug(id,"=",label[id]);
+      //console.debug(id,"=",label[id]);
       showLabel();
     });
   }
