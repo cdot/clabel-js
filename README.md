@@ -18,3 +18,5 @@ Load the UI in a browser using `localhost:9094`.
 
 The UI is used to compose an image of the label that is to be
 printed. You are shown what the label will look like when it is printed.
+
+Labels can be saved and reloaded. They are written to $HOME/Labels.

@@ -10,7 +10,6 @@
     <link rel="icon" href="images/PT1230PC.svg" />
     <link href="./styles.css" rel="stylesheet" type="text/css">
     <script src="./node_modules/socket.io/client-dist/socket.io.js"></script>
-    <script src="./node_modules/jquery/dist/jquery.min.js"></script>
     <script src="./node_modules/dom-to-image-more/dist/dom-to-image-more.min.js"></script>
     <script src="./UI.js" type="module"></script>
   </head>
@@ -19,67 +18,108 @@
       <img src="images/c.logo.png" style="height:60px;display:inline-flex">label
     </h1>
     <h2 id="info">
-      Printer model <span class="model_name">Unknown</span>, Tape width <span class="media_width_mm">unknown</span> mm, <span data-tooltip="The printable width gives the maximum height for the label that can be printed.">Printable width <span class="printable_width_mm">unknown</span> mm (<span class="printable_width_px">unknown</span> px)</span>
+      Printer model <span id="model_name">Unknown</span>,
+      Tape width <span id="media_width_mm">unknown</span> mm,
+      <span data-tooltip="The printable width defines the maximum height for labels.">
+        Printable width <span id="printable_width_mm">unknown</span> mm
+        (<span id="printable_width_px">unknown</span> px)
+      </span>
       <div>
-        Status: <span class="phase">Unknown</span>
+        Status: <span id="phase">Unknown</span>
       </div>
     </h2>
-    <div>
-      <div id="textarea_controls" class="bordered-box">
-        <h1 data-tooltip="You can type almost any raw HTML you like">
-          HTML
-        </h1>
-        <p>
-          <label for="select_font" data-tooltip="Select the default font">Font</label>
-          <select id="select_font">
-            <option>sansserif</option>
-            <option>serif</option>
-            <option>monospace</option>
-            <option>cursive</option>
-            <option>fantasy</option>
-            <option>emoji</option>
-            <option>math</option>
-            <option>fangsong</option>
-          </select>
-          <input id="font-size" class="three-digits" type="number" min="1" max="999" value="56" /> px,
-          <label for="left-margin" data-tooltip="Extra empty space after the label.">Left margin</label>
-          <input id="left-margin" class="three-digits" type="number" min="0" value="0"/> px,
-          <label for="right-margin" data-tooltip="Extra empty space to the right of the label.">Right margin</label>
-          <input id="right-margin" class="three-digits" type="number" min="0" value="0"/> px.
-        </p>
-        <textarea id="label_text" spellcheck="false"></textarea>
+    <div class="bordered-box" data-tooltip="Select a label to load, or reset ready for a new label">
+      <select id="loadables">
+      </select>
+      <button type="button" id="load">
+        Load Label</button>
+      <button type="button" id="clear" style="float:right"
+              data-tooltip="Reset all values back to defaults">
+        Reset</button>
+    </div>
+    <div class="bordered-box">
+      <label for="name" data-tooltip="A label has to have a name to be saved">
+        Name</label>
+      <input id="name"/>
+      <button type="button" id="save"
+              data-tooltip="A label has to have a name to be saved">
+        Save Label</button>
+    </div>
+    <div id="textarea_controls" class="bordered-box">
+      <h1>HTML</h1>
+      <div>
+        <label for="fontFamily" data-tooltip="Select the default font">
+          Font</label>
+        <select id="fontFamily">
+          <option>sansserif</option>
+          <option>serif</option>
+          <option>monospace</option>
+          <option>cursive</option>
+          <option>fantasy</option>
+          <option>emoji</option>
+          <option>math</option>
+          <option>fangsong</option>
+        </select>
+        <input id="fontSize" class="three-digits" type="number"
+               min="1" max="999" /> px,
+        <select id="textAlign">
+          <option value="center">Centre</option>
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+        </select>
+        <label for="textAlign"
+               data-tooltip="Text alignment when label spans several lines.">
+          aligned, </label>
+        <label for="leftMargin"
+               data-tooltip="Extra empty space to the left of the label.">
+          Left margin</label>
+        <input id="leftMargin" class="three-digits" type="number"
+               min="0" value="0"/> px,
+        <label for="rightMargin"
+               data-tooltip="Extra empty space to the right of the label.">
+          Right margin</label>
+        <input id="rightMargin" class="three-digits" type="number"
+               min="0" value="0"/> px
+      </div>
+      <div>Enter HTML to define the label:</div>
+      <textarea id="html" spellcheck="false"></textarea>
+    </div>
+    <div class="bordered-box">
+      <h1>Review</h1>
+      <div>This is your HTML rendered in the browser</div>
+      <div id="review_liner">
+        <div id="review_div"></div>
       </div>
     </div>
-    <h2 data-tooltip="This is your HTML rendered in the browser">
-      Review
-    </h2>
-    <div id="review_liner">
-      <div id="review_div" class="font-family-sanserif">strip</div>
+    <div class="bordered-box">
+      <h1>Printable Image</h1>
+      <div>
+        This is the actual bitmap that will be sent to the printer.
+      </div>
+      <div>
+        Rendering:
+        <label for="colourThreshold" data-tooltip="0-255. Controls the conversion of colours to black. Higher values mean more colours are converted.">"RGB" threshold</label>
+        <input id="colourThreshold" class="three-digits" type="number" min="1" max="255" value="200" />
+        <label for="alphaThreshold" data-tooltip="0-255. If the alpha channel on a pixel is less than this, it will be treated as transparent">"A" threshold</label>
+        <input id="alphaThreshold" class="three-digits" type="number" min="1" max="255" value="30" />,
+        <label for="tightCrop" data-tooltip="Crop empty space above and below the label.">Tight crop</label>
+        <input id="tightCrop" type="checkbox" />
+      </div>
+      <div id="image_liner">
+        <canvas id="image_canvas"></canvas>
+        <div id="tape-bounds"></div>
+      </div>
+      <div id="width-error" class="error">Label is wider than the tape</div>
+      <div id="rendering_info">
+        Width: <span id="label_width_mm"></span> mm (<span id="label_width_px"></span> px), length <span id="label_length_mm"></span> mm (<span id="label_length_px"></span> px)
+      </div>
+      <div id="rendering_error">
+      </div>
     </div>
-    <h2 data-tooltip="This is the actual bitmap that will be sent to the printer. If the image is wider than the printable area of the tape, the image will be split over multiple lengths of tape. A green box will appear showing the width of the first tape length">
-      Image
-    </h2>
-    <p>
-      Rendering:
-      <label for="colour_threshold" data-tooltip="Controls the conversion of colours to black and white. Higher values mean more colours are converted.">RGB</label>
-      <input id="colour_threshold" class="three-digits" type="number" min="1" max="255" value="200" />
-      <label for="alpha_threshold" data-tooltip="Controls the value of the alpha channel, below which a pixel will be treated as transparent">A</label>
-      <input id="alpha_threshold" class="three-digits" type="number" min="1" max="255" value="30" />,
-      <label for="tight_crop" data-tooltip="Crop empty space above and below the label.">Tight crop</label>
-      <input id="tight_crop" type="checkbox" />
-    </p>
-    <div id="image_liner">
-      <canvas id="image_canvas"></canvas>
-      <div id="tape_div"></div>
-    </div>
-    <div id="rendering_info">
-      Width: <span id="label_width_mm"></span> mm (<span id="label_width_px"></span> px), length <span id="label_length_mm"></span> mm (<span id="label_length_px"></span> px)
-    </div>
-    <hr />
     <div class="bordered-box">
       <button type="button" id="print" data-tooltip="Send the label to the server for printing">Print</button>
       <button type="button" id="eject" data-tooltip="Eject the tape">Eject</button>
-      <input id="eject_px" type="number" class="three-digits" value="70"> px (<span id="eject_mm"></span> mm)
+      <input id="ejectPX" type="number" class="three-digits" value="70"> px (<span id="ejectMM"></span> mm)
     </div>
   </body>
 </html>

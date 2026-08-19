@@ -95,7 +95,7 @@ class PTouch extends EventEmitter {
    */
   write(buff) {
     const b = (buff instanceof Buffer) ? buff : Buffer.from(buff);
-    //this.debug("->", b);
+    this.debug("->", b);
     return this.fd.write(b);
   }
 
@@ -110,7 +110,8 @@ class PTouch extends EventEmitter {
   read() {
     return this.fd.read()
     .then(data => {
-      //this.debug("<-", data);
+      if (data.bytesRead > 0)
+        this.debug("<-", data);
       return data;
     });
   }
@@ -307,6 +308,11 @@ class PTouch extends EventEmitter {
           i++;
         }
       }
+    })
+    .catch(e => {
+      console.error("Status poll failed", e);
+    })
+    .finally(() => {
       // Poll again in 1/5s
       setTimeout(() => this.pollStatus(), 200);
     });

@@ -3,7 +3,6 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 import Path from "path";
 const __dirname = Path.dirname(__filename);
-const docRoot = Path.normalize(Path.join(__dirname, "..", "..", "browser"));
 
 import getopt from "posix-getopt";
 
@@ -17,13 +16,14 @@ const DESCRIPTION = [
   "\tRun a label print server for a Brother label printer",
   "OPTIONS",
   "\t-d, --device <path> - path to printer (default /dev/usb/lp0)",
-  "\t-m, --model <model> - Set the printer type e.g. --model PT1230",
+  "\t-f, --files <path> - get label files from this path (default ~/Labels)",
+  "\t-m, --model <model> - set the printer type e.g. --model PT1230",
   "\t\tIf the model is not specified, the --device will be interrogated",
   "\t\t--model is required if --write_only is given",
   "\t-h, --help - output this information",
-  "\t-p, --port <file> - Port to start server on (default 9094)",
-  "\t-w, --write_only - only write, don't try to read from the device",
-  "\t-v, --verbose - (prints to console.debug)"
+  "\t-p, --port <port> - port to start server on (default 9094)",
+  "\t-v, --verbose - prints debug info to console.debug",
+  "\t-w, --write_only - only write, don't try to read from the device"
 ].join("\n");
 
 const go_parser = new getopt.BasicParser(
@@ -33,7 +33,8 @@ const go_parser = new getopt.BasicParser(
 // Option defaults
 const options = {
   port: 9094,
-  docRoot: docRoot,
+  installPath: Path.normalize(Path.join(__dirname, "..", "..", "browser")),
+  labelsPath: `${process.env.HOME}/Labels`,
   device: "/dev/usb/lp0",
   debug: () => {}
 };
@@ -51,6 +52,8 @@ while ((option = go_parser.getopt())) {
   switch (option.option) {
   default: fail(`Unknown option -${option.option}\n${DESCRIPTION}`);
   case 'd': options.device = option.optarg ; break;
+  case 'f': options.labelsPath =
+    option.optarg.replace("~", process.env.HOME); break;
   case 'h': fail();
   case 'm': options.model = Models.getModelByName(option.optarg); break;
   case 'p': options.port = option.optarg ; break;
@@ -69,5 +72,13 @@ if (options.write_only && !options.model)
   fail("--write_only requires --model");
 
 const server = new Server(options);
+
+// Check that the file path is accessible
+server.listLabels()
+.catch(e => {
+  console.error(`Files path ${options.labelsPath} is not accessible`);
+  process.exit();
+});
+
 server.listen(options.port);
 

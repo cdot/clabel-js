@@ -5,11 +5,13 @@ body {
 h1 {
   padding: 0;
   margin: 0.25em;
+  font-size: 12pt;
 }
 
-h2 {
-  font-style: italic;
-  font-size: 12pt;
+.error {
+  font-weight: bold;
+  color: red;
+  display: none;
 }
 
 [data-tooltip]:hover:after {
@@ -29,20 +31,20 @@ h2 {
 }
 
 /* Supported font families */
-.font-family-serif {
-  font-family: Times, "Times New Roman", Georgia, serif;
+.font-family-sansserif {
+  font-family: Arial, Verdana, Tahoma, "Trebuchet MS", sans-serif;
 }
 
-.font-family-sansserif {
-  font-family: Verdana, Arial, Helvetica, sans-serif;
+.font-family-serif {
+  font-family: Palatino, Georgia, "Times New Roman", Garamond, serif;
 }
 
 .font-family-monospace {
-  font-family: "Lucida Console", Courier, monospace;
+  font-family: Consolas, "Lucida Console", "Courier New", monospace;
 }
 
 .font-family-cursive {
-  font-family: cursive;
+  font-family: "Brush Script MT", cursive;
 }
 
 .font-family-fantasy {
@@ -66,6 +68,10 @@ h2 {
     width: 4em;
 } 
 
+#html {
+  width: 100%;
+}
+
 #review_liner {
   border:1px solid blue;
   /* Using any other display: results in the box height being dictated
@@ -84,6 +90,7 @@ h2 {
 
 #image_canvas {
   width: 100%;
+  min-height: 50px;
 }
 
 #image_liner {
@@ -94,15 +101,18 @@ h2 {
 }
 
 /* overlay div shown when the label height exceeds a single tape run,
- *shows the bounds of that first tape run (which will be printable width high)
+ * shows the bounds of that first tape run (which will be printable width high)
  */
-#tape_div {
+#tape-bounds {
   position: absolute;
+  top: 0;
+  left: 0;
   background-color: #FF000020;
   width:100%;
   z-index:1;
 }
-#label_text {
+
+#edit-html {
   width: 100%;
   height: 50px;
 }
